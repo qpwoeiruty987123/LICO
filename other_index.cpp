@@ -1,5 +1,6 @@
 #include <other_index.hpp>
 
+#include "la_vector_enumerate.hpp"
 #include "lico_index_build.hpp"
 
 std::string log_filename = "";
@@ -32,15 +33,29 @@ void query_collection_others(const std::string &input_basename, const std::strin
 }
 
 template <uint64_t epsilon=64>
-void build_collection_la_vector(const std::string input_basename, const std::string output_basename) {
-    typedef lico_sequence::lico_builder<uint32_t, epsilon> PGM_INDEX_BUILDER;
-    PGM_INDEX_BUILDER index;
+void build_collection_la_vector(const std::string &input_basename, const std::string &output_basename) {
+    typedef lico_sequence::lico_builder<uint32_t, epsilon> LA_INDEX;
+    LA_INDEX index;
     index.build_model(input_basename + ".docs", 1);
     index.data_test(input_basename + ".docs");
     index.save_model(output_basename);
     if(!log_filename.empty()) { // save covered and residual
         index.statistic_index(log_filename, true);
     }
+}
+
+template <uint64_t epsilon=64>
+void decode_collection_la_vector(const std::string &input_basename, const std::string &output_basename) {
+    typedef la_vector_sequence::la_vector_decoder<uint32_t, epsilon> LA_INDEX;
+    LA_INDEX index;
+    index.test_model(output_basename, input_basename + ".docs", "normal");
+}
+
+template <uint64_t epsilon=64>
+void query_collection_la_vector(const std::string &input_basename, const std::string &output_filename) {
+    typedef la_vector_sequence::la_vector_querier<uint32_t, epsilon> LA_INDEX;
+    LA_INDEX index;
+    index.test_query(output_filename, query_filename, query_type, input_basename + ".docs");
 }
 
 
@@ -85,20 +100,43 @@ int main(int argc, const char** argv)
                 case 8191: build_collection_la_vector<8191>(input_basename, output_basename); break;
                 case 16383: build_collection_la_vector<16383>(input_basename, output_basename); break;
                 case 32767: build_collection_la_vector<32767>(input_basename, output_basename); break;
-                case 65535: build_collection_la_vector<65535>(input_basename, output_basename); break;
-                case 131071: build_collection_la_vector<131071>(input_basename, output_basename); break;
-                case 262143: build_collection_la_vector<262143>(input_basename, output_basename); break;
                 default: std::cerr << "Unsupported Epsilon Value: " << epsilon << std::endl; break;
             }
         }
         else if (function_type == "decode") {
-
+            switch (epsilon) {
+                case 15: decode_collection_la_vector<15>(input_basename, output_basename); break;
+                case 31: decode_collection_la_vector<31>(input_basename, output_basename); break;
+                case 63: decode_collection_la_vector<63>(input_basename, output_basename); break;
+                case 127: decode_collection_la_vector<127>(input_basename, output_basename); break;
+                case 255: decode_collection_la_vector<255>(input_basename, output_basename); break;
+                case 511: decode_collection_la_vector<511>(input_basename, output_basename); break;
+                case 1023: decode_collection_la_vector<1023>(input_basename, output_basename); break;
+                case 2047: decode_collection_la_vector<2047>(input_basename, output_basename); break;
+                case 4095: decode_collection_la_vector<4095>(input_basename, output_basename); break;
+                case 8191: decode_collection_la_vector<8191>(input_basename, output_basename); break;
+                case 16383: decode_collection_la_vector<16383>(input_basename, output_basename); break;
+                case 32767: decode_collection_la_vector<32767>(input_basename, output_basename); break;
+                default: std::cerr << "Unsupported Epsilon Value: " << epsilon << std::endl; break;
+            }
         }
-            // decode_collection_others(output_basename);
         else if (function_type == "query") {
-
+            switch (epsilon) {
+                case 15: query_collection_la_vector<15>(input_basename, output_basename); break;
+                case 31: query_collection_la_vector<31>(input_basename, output_basename); break;
+                case 63: query_collection_la_vector<63>(input_basename, output_basename); break;
+                case 127: query_collection_la_vector<127>(input_basename, output_basename); break;
+                case 255: query_collection_la_vector<255>(input_basename, output_basename); break;
+                case 511: query_collection_la_vector<511>(input_basename, output_basename); break;
+                case 1023: query_collection_la_vector<1023>(input_basename, output_basename); break;
+                case 2047: query_collection_la_vector<2047>(input_basename, output_basename); break;
+                case 4095: query_collection_la_vector<4095>(input_basename, output_basename); break;
+                case 8191: query_collection_la_vector<8191>(input_basename, output_basename); break;
+                case 16383: query_collection_la_vector<16383>(input_basename, output_basename); break;
+                case 32767: query_collection_la_vector<32767>(input_basename, output_basename); break;
+                default: std::cerr << "Unsupported Epsilon Value: " << epsilon << std::endl; break;
+            }
         }
-            // query_collection_others(input_basename, output_basename);
     }
 
 

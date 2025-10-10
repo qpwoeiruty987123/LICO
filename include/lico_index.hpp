@@ -262,12 +262,12 @@ namespace lico
         }
 
         uint64_t ground_truth_build_size_in_bytes() const {
-            return (double(segments_size) * 136.0 / 8.0)  + sizeof(uint8_t) + corrections_size_in_bytes() + signs_size_in_bytes();
+            return (double(segments_size) * 17.0)  + sizeof(uint8_t) + corrections_size_in_bytes() + signs_size_in_bytes();
         }
 
         uint64_t segment_size_in_bytes(bool is_la_vector=false) const {
             if (is_la_vector)
-                return (double(segments_size) * 128.0 + sizeof(uint8_t)); // for la_vector, one segment need a 64 bit floating slope, 32 bit intercept, 32 bit breakpoint
+                return (double(segments_size) * 16.0 + sizeof(uint8_t)); // for la_vector, one segment need a 64 bit floating slope, 32 bit intercept, 32 bit breakpoint
             else
                 return ((seg_covered_compress.bit_size() + seg_intercept_compress.bit_size() + seg_slope_significand_compress.bit_size() + seg_slope_exponent_compress.bit_size()) / CHAR_BIT) + sizeof(uint8_t); //here uint8_t represents the byte need for Epsilon_Data, actually it's only need 8 bit, but we store it as u32 for convenient
         }

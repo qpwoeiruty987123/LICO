@@ -8,6 +8,8 @@
 #include <lico_partition.hpp>
 #include <../external/mm_file/include/mm_file/mm_file.hpp>
 
+#include "la_vector_enumerate.hpp"
+
 namespace lico_sequence
 {
 
@@ -483,7 +485,6 @@ namespace lico_sequence
                     std::vector<K> result_decode(enumerator_tmp.n);
 
                     // enumerator_tmp.normal_decode(result_decode.data());
-
                     enumerator_tmp.simd_init();
                     enumerator_tmp.simd_decode_512i(result_decode.data());
 
@@ -501,7 +502,6 @@ namespace lico_sequence
 
             }
             else {
-
                 std::cerr << std::endl << "Data Test Epsilon: " << epsilon << std::endl;
                 std::cerr << "Read File [Test]: " << input_basename << std::endl;
                 mm::file_source<K> input(input_basename.c_str(), mm::advice::sequential);
@@ -511,18 +511,18 @@ namespace lico_sequence
                 for (size_t i = 2; i < input.size();) {
                     K n = data[i];
                     std::vector<K> sequence(data + i + 1, data + i + n + 1);
-                    auto& variant_index = index_sequences[posi++];
-                    std::visit([&sequence, &data_unequal_test](auto &index) {
-                        index.segment_init();
-                        std::vector<K> result1 = index.normal_decode();
-                        assert(result1.size() == sequence.size());
-                        for (auto j = 0; j < result1.size(); j++) {
-                            if (sequence[j] != result1[j]) {
-                                // std::cerr << sequence[j] << " " << result1[j] << " " << long(sequence[j]) - long(result1[j]) << std::endl;
-                                data_unequal_test++;
-                            }
+                    lico_enumerator<K> enumerator_tmp = create_enumerator_from_single_index<K>(index_sequences[posi++]);
+                    std::vector<K> result_decode(enumerator_tmp.n);
+                    enumerator_tmp.normal_decode(result_decode.data());
+
+                    assert(result_decode.size() == sequence.size());
+
+                    for (auto j = 0; j < result_decode.size(); j++) {
+                        if (sequence[j] != result_decode[j]) {
+                            data_unequal_test++;
+                            // std::cerr << "Unequal Value: " << result_decode[j] << " " << sequence[j] << " " << posi << " " << j << std::endl;
                         }
-                    }, variant_index);
+                    }
                     i += n + 1;
                 }
             }

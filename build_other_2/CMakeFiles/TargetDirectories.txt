@@ -1,0 +1,10 @@
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_build.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_build_none.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_decode.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_decode_none.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_query.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_query_none.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/lico_estimate.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/other.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/edit_cache.dir
+/mnt/home/xyzhu/codes/pgm_index/build_other_2/CMakeFiles/rebuild_cache.dir

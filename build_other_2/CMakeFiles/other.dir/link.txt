@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -w -rdynamic CMakeFiles/other.dir/other_index.cpp.o -o other   -L/mnt/home/xyzhu/codes/pgm_index/include/sdsl-lite/lib  -L/mnt/home/xyzhu/codes/pgm_index/external/FastPFor/build  -Wl,-rpath,/mnt/home/xyzhu/codes/pgm_index/include/sdsl-lite/lib:/mnt/home/xyzhu/codes/pgm_index/external/FastPFor/build -lsdsl -lFastPFOR 
