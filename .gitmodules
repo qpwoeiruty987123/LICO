@@ -1,0 +1,3 @@
+[submodule "external/FastPFor"]
+	path = external/FastPFor
+	url = https://github.com/fast-pack/FastPFOR

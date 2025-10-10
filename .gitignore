@@ -1,0 +1,17 @@
+cmake-build-debug/
+cmake-build-release/
+SIMDSetOperations/
+.idea/
+.vscode/
+build_test/
+build_none/
+build_greedy/
+build_estimate/
+build_fastpfor/
+build_build/
+build_other/
+nohup_output/
+nohup_output_tmp/
+*.sh
+*.out
+*.py
