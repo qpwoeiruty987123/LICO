@@ -10,6 +10,7 @@ build_estimate/
 build_fastpfor/
 build_build/
 build_other/
+build_other_2/
 nohup_output/
 nohup_output_tmp/
 *.sh

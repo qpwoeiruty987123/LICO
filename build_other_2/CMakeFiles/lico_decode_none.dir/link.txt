@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -w -rdynamic CMakeFiles/lico_decode_none.dir/lico_decode.cpp.o -o lico_decode_none   -L/mnt/home/xyzhu/codes/pgm_index/include/sdsl-lite/lib  -L/mnt/home/xyzhu/codes/pgm_index/external/FastPFor/build  -Wl,-rpath,/mnt/home/xyzhu/codes/pgm_index/include/sdsl-lite/lib:/mnt/home/xyzhu/codes/pgm_index/external/FastPFor/build -lsdsl 

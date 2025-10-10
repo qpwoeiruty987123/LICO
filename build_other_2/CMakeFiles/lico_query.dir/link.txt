@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -w -rdynamic CMakeFiles/lico_query.dir/lico_query.cpp.o -o lico_query   -L/mnt/home/xyzhu/codes/pgm_index/include/sdsl-lite/lib  -L/mnt/home/xyzhu/codes/pgm_index/external/FastPFor/build  -Wl,-rpath,/mnt/home/xyzhu/codes/pgm_index/include/sdsl-lite/lib:/mnt/home/xyzhu/codes/pgm_index/external/FastPFor/build -lsdsl -lFastPFOR 
