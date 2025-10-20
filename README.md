@@ -5,54 +5,63 @@ Compression Framework
 This repository provides end-to-end components for building, storing, decoding, and querying LICO-compressed posting lists, with both scalar and AVX-512 SIMD implementation.
 
 ## Dataset preparation
-The expected dataset directory layout:
+Following the [ds2i](https://github.com/ot/ds2i) format, your dataset directory should be structured as follows:
+
 ```
 <data_dir>/
-	└─ <DATASET_NAME>/
-			 ├─ <DATASET_NAME>.docs        # posting lists in binary
-			 ├─ <DATASET_NAME>-2.queries   # one query per line, list IDs separated by spaces
-			 ├─ <DATASET_NAME>-3.queries
-			 ├─ <DATASET_NAME>-4.queries
-			 └─ <DATASET_NAME>-5.queries
+    └── <DATASET_NAME>/
+        ├── <DATASET_NAME>.docs        # Binary file containing posting lists
+        ├── <DATASET_NAME>-2.queries   # Queries with 2 terms, one per line (space-separated document IDs)
+        ├── <DATASET_NAME>-3.queries   # Queries with 3 terms, one per line (space-separated document IDs)
+        ├── <DATASET_NAME>-4.queries   # Queries with 4 terms, one per line (space-separated document IDs)
+        └── <DATASET_NAME>-5.queries   # Queries with 5 terms, one per line (space-separated document IDs)
 ```
+Here's a more natural and clear version of the text:
 
-Binary `.docs` format (little-endian `uint32_t`):
-- `data[0] = 1` (magic number, asserted by the builder)
-- `data[1] = universe_size`
-- Then repeated per-list blocks: `n`, followed by `n` strictly increasing docIDs
-	- Each list must be strictly increasing; the max must be < `universe_size` (checked during build)
+---
 
-Query files (`.queries`) format:
-- Plain text; each line is a whitespace-separated list of integer list IDs; duplicates on the same line are removed during loading, here is an example of one query:
-    
-    `2563 876 1236 869 235`
-- Use `<DATASET_NAME>-<query_num>.queries` to select 2/3/4/5-term query sets
+**Binary `.docs` format (little-endian `uint32_t`):**
 
-- Notably, the file `<DATASET_NAME>-5.queries` contains queries that the number of terms is equal of larger than five
+- The first value, `data[0]`, is a magic number set to `1` (used by the builder for validation).
+- The second value, `data[1]`, specifies the `universe_size` (the maximum possible document ID).
+- The rest of the file contains repeated blocks for each posting list:
+  - Each block starts with `n`, the number of documents in the list.
+  - This is followed by `n` strictly increasing document IDs (stored as `uint32_t`).
+- **Important**: Each posting list must be strictly increasing, and all document IDs must be less than `universe_size`. These conditions are checked during the index build process.
 
-The builder runs an internal `data_test` that decodes and checks equality against inputs; any mismatch aborts with details.
+---
 
+**Query files (`.queries`) format:**
+
+- Plain text files where each line represents a single query, each query is a list of integer document IDs separated by whitespace, and duplicate IDs on the same line are automatically removed when the queries are loaded.
+- Example of a single query line:
+  ```
+  2563 876 1236 869 235
+  ```
+- Query files are named using the pattern `<DATASET_NAME>-<query_num>.queries` to indicate the number of terms:
+  - Use `-2.queries` for 2-term queries, `-3.queries` for 3-term, and so on.
+- **Note**: The file `<DATASET_NAME>-5.queries` contains queries with **five or more** terms.
 ## Quickly Start
 **Step 1:** You need a server that supports the following instruction sets for compilation: LZCNT, BMI2, and AVX-512 (including AVX512F, AVX512VL, AVX512CD, and AVX512DQ).
 
-**Step 2:** If you want to enable huge pages, comment out line 17 and uncomment line 18 in the CMakeLists.txt file.
+**Step 2:** If you want to enable huge pages, you need to ensure that your system has at least **2048 huge pages of 2M size**. Then, please comment out line 17 and uncomment line 18 in the CMakeLists.txt file.
 
 **Step 3:** Two convenience bash scripts are provided at the repository root:
 - `bdq_lico_greedy.sh`: residuals not FastPFor-compressed (LICO), including build, decode and query test.
 - `bdq_lico++_greedy.sh`: residuals FastPFor-compressed (LICO++), including build, decode and query test
 
-**Step 4:** Parameters you should adjust according to your environment in these scripts:
+**Step 4:** You should adjust followed parameters according to your environment in above scripts:
 - `result_dir`: The root directory for saving indexes and logs.
 - `data_dir`: The dataset root directory containing `<DATASET_NAME>`.
 - `code_dir`: The CMake build output directory.
 - `dataset`: The name(s) of the dataset(s) to run.
 - `read_only`: Set to `t` or `f`. When set to `t`, the script will read an existing index from `index_save_dir` without rebuilding it.
 
-**Step 5:** Build dependencies:
-- Clone submodules `git submodule update --init --recursive`.
-- Prepare [FastPFor](https://github.com/fast-pack/FastPFOR) library at the path `./external/FastPFor`. You need to clone and compile the library files under ./external/FastPFor/build.
-- Prepare [libdivide](https://github.com/ridiculousfish/libdivide) library at the path `./external/libdivide`. You can just clone it, it's a header-only library.
-- Prepare [mm_file](https://github.com/jermp/mm_file) library at the path `./external/mm_file`. You can just clone it, it's a header-only library.
+**Step 5:** Set up build dependencies:
+1.  **Initialize submodules**: Run `git submodule update --init --recursive` to clone all submodules. If it dose not work, you can clone the followed library manually.
+2.  **Prepare the FastPFor library**: Place the [FastPFor](https://github.com/fast-pack/FastPFOR) library at `./external/FastPFor`. You'll need to clone the repository and compile the library files inside the `./external/FastPFor/build` directory.
+3.  **Prepare the libdivide library**: Place the [libdivide](https://github.com/ridiculousfish/libdivide) library at `./external/libdivide`. This is a header-only library, so simply cloning the repository is sufficient.
+4.  **Prepare the mm_file library**: Place the [mm_file](https://github.com/jermp/mm_file) library at `./external/mm_file`. This is also a header-only library, so just clone the repository to complete the setup.
 
 **Step 6:** Run experiments
 - Test LICO
@@ -65,11 +74,11 @@ sh bdq_lico++_greedy.sh
 ```
 
 
-Other parameters that use default settings:
+Additional parameters (using default values unless specified):
 - `lico_m`: The upper bound on the number of partitions `m` (limits greedy splitting).
 - `compress_type`: Compression method for residuals; options are `none` or `fastpfor`. Note that if you want to test LICO, you must set `compress_type=none` and run the executable with the "none" suffix, and vice versa.
 - `decode_type`: `simd` (requires AVX-512) or `normal`
-- `query_type`: `AND` (intersection) or `OR` (union)
+- `query_type`: `AND` (Intersection) or `OR` (Union)
 - `query_num`: 2/3/4/5 (selects the corresponding queries file)
 
 

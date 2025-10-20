@@ -48,7 +48,7 @@ do
    echo "=================Decode index for dataset: $dataset with epsilon: $epsilon================="
    for decode_type in "simd"
    do
-     for repeat in 1
+     for repeat in 1 2 3 4 5
      do
        echo "————————————repeat : $repeat————————————"
        $code_dir/lico_decode_none $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $decode_type $log_save_dir $compress_type
@@ -59,7 +59,7 @@ do
    echo "=================Query index for dataset: $dataset with epsilon: $epsilon================="
    for query_type in "AND" "OR"
    do
-     for query_num in 5
+     for query_num in 5 4 3 2
      do
        for decode_type in "simd"
        do
