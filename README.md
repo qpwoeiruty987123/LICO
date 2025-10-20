@@ -48,8 +48,13 @@ The builder runs an internal `data_test` that decodes and checks equality agains
 - `dataset`: The name(s) of the dataset(s) to run.
 - `read_only`: Set to `t` or `f`. When set to `t`, the script will read an existing index from `index_save_dir` without rebuilding it.
 
+**Step 5:** Build dependencies:
+- Clone submodules `git submodule update --init --recursive`.
+- Prepare [FastPFor](https://github.com/fast-pack/FastPFOR) library at the path `./external/FastPFor`. You need to clone and compile the library files under ./external/FastPFor/build.
+- Prepare [libdivide](https://github.com/ridiculousfish/libdivide) library at the path `./external/libdivide`. You can just clone it, it's a header-only library.
+- Prepare [mm_file](https://github.com/jermp/mm_file) library at the path `./external/mm_file`. You can just clone it, it's a header-only library.
 
-**Step 5:** Run Experiments
+**Step 6:** Run experiments
 - Test LICO
 ```bash
 sh bdq_lico_greedy.sh
