@@ -5,6 +5,12 @@
 # define RESIDUAL_COMPRESS 0
 # endif
 
+#ifndef HUGEPAGE
+#define USE_HUGEPAGE 0
+#else
+#define USE_HUGEPAGE 1
+#endif
+
 static constexpr size_t block_size_rice = 8192;
 
 static std::string residual_compress_type = "fastpfor";

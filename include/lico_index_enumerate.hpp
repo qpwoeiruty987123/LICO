@@ -12,12 +12,6 @@
 #include <lico_fastpfor.hpp>
 #endif
 
-#ifndef HUGEPAGE
-#define USE_HUGEPAGE 0
-#else
-#define USE_HUGEPAGE 1
-#endif
-
 
 
 

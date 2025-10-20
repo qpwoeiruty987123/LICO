@@ -243,37 +243,6 @@ public:
         uint32_t y_b = rectangle[1].y;
 
         return {delta_y, delta_x, y_b, x_b};
-
-
-        // return {slope_significand, slope_exponent, intercept};
-    }
-
-    std::tuple<SY, uint8_t, SY> get_fixed_point_segment(X origin, X max_input) const { // fixed point segment
-        if (one_point()) {
-            return {0, 0, (rectangle[0].y + rectangle[1].y) / 2};
-        }
-
-        auto &p1 = rectangle[1];
-
-        auto max_slope = rectangle[3] - rectangle[1]; // fix max_slope = p3 - p1
-
-        auto is_slope_integral = max_slope.dy % max_slope.dx == 0;      // slope = dy/dx
-        // if (is_slope_integral) {
-        //     std::cerr << "Warning: integral slope, consider using integer arithmetic for better performance" << std::endl;
-        // }
-        // if (max_input == 1) {
-        //     std::cerr << "Here" << std::endl;
-        // }
-        uint8_t slope_exponent = is_slope_integral ? 0 : (uint8_t) std::ceil(std::log2(max_input)) + 1;
-
-        auto slope_significand = (max_slope.dy << slope_exponent) / max_slope.dx;
-        auto intercept_n = max_slope.dy * (SX(origin) - p1.x);  
-        auto intercept_d = max_slope.dx;
-        auto rounding_term = ((intercept_n < 0) ^ (intercept_d < 0) ? -1 : +1) * intercept_d / 2;
-        auto intercept = (intercept_n + rounding_term) / intercept_d + p1.y;
-
-        // uint64_t, uint16_t, SY=__int128
-        return {slope_significand, slope_exponent, intercept};
     }
 };
 

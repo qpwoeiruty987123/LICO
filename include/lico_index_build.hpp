@@ -72,36 +72,6 @@ namespace lico_sequence
                     index_partition_sequences.emplace_back(build_index_sequences);
 
                 }
-                else if (epsilon == 1) {                     // adapt each list build
-                    std::vector<LICOIndex> build_index_sequences;
-                    build_index_sequences.reserve(20);
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 1));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 3));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 7));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 15));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 31));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 63));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 127));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 511));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 1023));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 2047));
-                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 4095));
-                    uint64_t min_size = INT64_MAX;
-                    uint32_t min_index = 0;
-                    uint32_t min_epsilon = 0;
-                    uint32_t index_count = 0;
-                    for (auto &index : build_index_sequences) {
-                        if (index.ground_truth_build_size_in_bytes() < min_size) {
-                            min_size = index.ground_truth_build_size_in_bytes();
-                            min_index = index_count;
-                            min_epsilon = index.Epsilon_Data;
-                        }
-                        index_count++;
-                    }
-                    index_sequences.push_back(build_index_sequences[min_index]);
-                    epsilon_stats[min_epsilon]++;
-                    build_index_sequences.clear();
-                }
                 else {
                     index_sequences.push_back(lico::LICO<K>(sequence, epsilon));
                 }
@@ -121,10 +91,6 @@ namespace lico_sequence
                     std::cerr << "Epsilon:\t" << it -> first << "\tCount:\t" << it -> second << std::endl;
                 }
                 std::cerr << "Total Partitions:\t" << total_partitions << " Epsilons Bytes: " << (total_partitions) << std::endl;
-            } else if (epsilon == 1) {
-                for (auto it = epsilon_stats.begin(); it != epsilon_stats.end(); it++) {
-                    std::cerr << "Epsilon:\t" << it -> first  << "\tCount:\t" << it -> second << std::endl;
-                }
             }
         }
 

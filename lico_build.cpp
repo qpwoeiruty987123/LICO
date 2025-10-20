@@ -18,9 +18,6 @@ void build_collection_lico(const std::string input_basename, const std::string o
         index.save_model(output_basename);
         if(!log_filename.empty()) { // save covered and residual
             index.statistic_index(log_filename);
-
-            // index.statistic_gap_list(input_basename + ".docs", log_filename);
-            // index.statistic_gap_segment(log_filename);
         }
     } else {
         index.load_model(output_basename);
@@ -28,12 +25,6 @@ void build_collection_lico(const std::string input_basename, const std::string o
 
         if(!log_filename.empty()) { // save covered and residual
             index.statistic_index(log_filename);
-
-            // index.statistic_page_gap_variance_page_list(input_basename + ".docs", log_filename);
-
-            // index.statistic_gap_list(input_basename + ".docs", log_filename);
-
-            // index.save_residual_and_residual_gaps_segments(log_filename);
         }
     }
 }
