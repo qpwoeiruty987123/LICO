@@ -228,6 +228,26 @@ public:
 
     X get_first_x() const { return first; }
 
+    std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> get_lico_segment() const { // fixed point segment
+        if (one_point()) {
+            return {0, 0, 0, 0};
+        }
+
+        auto &p1 = rectangle[1];
+
+        auto max_slope = rectangle[3] - rectangle[1]; // fix max_slope = p3 - p1
+
+        uint32_t delta_x = max_slope.dx;
+        uint32_t delta_y = max_slope.dy;
+        uint32_t x_b = rectangle[1].x;
+        uint32_t y_b = rectangle[1].y;
+
+        return {delta_y, delta_x, y_b, x_b};
+
+
+        // return {slope_significand, slope_exponent, intercept};
+    }
+
     std::tuple<SY, uint8_t, SY> get_fixed_point_segment(X origin, X max_input) const { // fixed point segment
         if (one_point()) {
             return {0, 0, (rectangle[0].y + rectangle[1].y) / 2};

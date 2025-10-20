@@ -6,9 +6,7 @@
 #include <lico_index.hpp>
 #include <lico_index_enumerate.hpp>
 #include <lico_partition.hpp>
-#include <../external/mm_file/include/mm_file/mm_file.hpp>
-
-#include "la_vector_enumerate.hpp"
+#include <mm_file.hpp>
 
 namespace lico_sequence
 {
@@ -16,8 +14,8 @@ namespace lico_sequence
     template <typename K, size_t epsilon = 64> // K is uint32_t or uint64_t
     class lico_builder {
     public:
-        std::vector<std::vector<LICOVariant>> index_partition_sequences; // store the partitioned index sequences
-        std::vector<LICOVariant> index_sequences;
+        std::vector<std::vector<LICOIndex>> index_partition_sequences; // store the partitioned index sequences
+        std::vector<LICOIndex> index_sequences;
         uint64_t data_size = 0;
         uint64_t data_unequal = 0;
         uint64_t optPFD_size = 0;
@@ -63,77 +61,41 @@ namespace lico_sequence
                     if (data_partition -> blocks.size() == 1)
                         total_unparted_blocks++;
 
-                    std::vector<LICOVariant> build_index_sequences;
+                    std::vector<LICOIndex> build_index_sequences;
                     for (const auto & block: data_partition -> blocks) {
                         size_t Epsilon_Data = block.epsilon;
-                        LICOVariant variant_index;
-
-                        if (Epsilon_Data < 3) Epsilon_Data = 3;
-                        if (Epsilon_Data > 1048575) Epsilon_Data = 1048575;
-                        switch (Epsilon_Data) {
-                            case 1: variant_index = lico::LICO<K, 1>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 3: variant_index = lico::LICO<K, 3>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 7: variant_index = lico::LICO<K, 7>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 15: variant_index = lico::LICO<K, 15>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 31: variant_index = lico::LICO<K, 31>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 63: variant_index = lico::LICO<K, 63>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 127: variant_index = lico::LICO<K, 127>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 255: variant_index = lico::LICO<K, 255>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 511: variant_index = lico::LICO<K, 511>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 1023: variant_index = lico::LICO<K, 1023>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 2047: variant_index = lico::LICO<K, 2047>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 4095: variant_index = lico::LICO<K, 4095>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 8191: variant_index = lico::LICO<K, 8191>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 16383: variant_index = lico::LICO<K, 16383>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 32767: variant_index = lico::LICO<K, 32767>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 65535: variant_index = lico::LICO<K, 65535>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 131071: variant_index = lico::LICO<K, 131071>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 262143: variant_index = lico::LICO<K, 262143>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 524287: variant_index = lico::LICO<K, 524287>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            case 1048575: variant_index = lico::LICO<K, 1048575>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx); break;
-                            default: throw std::runtime_error("Unsupported epsilon Value: " + std::to_string(Epsilon_Data)); break;
-                        }
+                        // if (Epsilon_Data < 3) Epsilon_Data = 3;
+                        LICOIndex variant_index = lico::LICO<K>(sequence.begin() + block.start_idx, sequence.begin() + block.end_idx, Epsilon_Data, block.start_idx);
                         epsilon_stats[Epsilon_Data]++;
-                        build_index_sequences.emplace_back(variant_index);
+                        build_index_sequences.push_back(variant_index);
                     }
                     index_partition_sequences.emplace_back(build_index_sequences);
 
                 }
                 else if (epsilon == 1) {                     // adapt each list build
-                    std::vector<LICOVariant> build_index_sequences;
+                    std::vector<LICOIndex> build_index_sequences;
                     build_index_sequences.reserve(20);
-                    build_index_sequences.emplace_back(lico::LICO<K, 1>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 3>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 7>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 15>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 31>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 63>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 127>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 255>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 511>(sequence));
-                    build_index_sequences.emplace_back(lico::LICO<K, 1023>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 2047>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 4095>(sequence));
-
-                    // build_index_sequences.emplace_back(lico::LICO<K, 8191>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 16383>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 32767>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 65535>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 131071>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 262143>(sequence));
-                    // build_index_sequences.emplace_back(lico::LICO<K, 524287>(sequence));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 1));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 3));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 7));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 15));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 31));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 63));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 127));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 511));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 1023));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 2047));
+                    build_index_sequences.emplace_back(lico::LICO<K>(sequence, 4095));
                     uint64_t min_size = INT64_MAX;
                     uint32_t min_index = 0;
                     uint32_t min_epsilon = 0;
                     uint32_t index_count = 0;
-                    for (auto &variant_index : build_index_sequences) {
-                        std::visit([&min_size, &min_index, &index_count, &min_epsilon](auto &index) {
-                            if (index.ground_truth_build_size_in_bytes() < min_size) {
-                                min_size = index.ground_truth_build_size_in_bytes();
-                                min_index = index_count;
-                                min_epsilon = index.Epsilon_Data;
-                            }
-                        }, variant_index);
+                    for (auto &index : build_index_sequences) {
+                        if (index.ground_truth_build_size_in_bytes() < min_size) {
+                            min_size = index.ground_truth_build_size_in_bytes();
+                            min_index = index_count;
+                            min_epsilon = index.Epsilon_Data;
+                        }
                         index_count++;
                     }
                     index_sequences.push_back(build_index_sequences[min_index]);
@@ -141,7 +103,7 @@ namespace lico_sequence
                     build_index_sequences.clear();
                 }
                 else {
-                    index_sequences.push_back(lico::LICO<K, epsilon>(sequence));
+                    index_sequences.push_back(lico::LICO<K>(sequence, epsilon));
                 }
                 data_size += sequence.size();
                 i += n + 1;
@@ -166,7 +128,7 @@ namespace lico_sequence
             }
         }
 
-        void statistic_index(std::string output_basename="", bool is_la_vector=false) {
+        void statistic_index(std::string output_basename="") {
             double segments_count = 0;
             uint64_t segments_count_real = 0;
             uint64_t segments_size = 0;
@@ -174,9 +136,6 @@ namespace lico_sequence
             uint64_t signs_size = 0;
             uint64_t errorpoint_size = 0;
             uint64_t total_list = 0;
-            uint64_t calculate_by_total_size = 0;
-            uint64_t slope_significand_max = 0;
-            uint32_t slope_exponent_max = 0;
             double avg_covered = 0;
 
             std::ofstream file(output_basename + ".statistic_log.txt");
@@ -189,31 +148,21 @@ namespace lico_sequence
                 for (auto & index_partition : index_partition_sequences) {
 
                     uint64_t list_segments_size = 0, list_corrections_size = 0, list_signs_size = 0, list_size = 0;
-                    for (auto& variant_index : index_partition) {
-                        std::visit([&file_r, &list_count, &list_size, &avg_covered, &segments_count_real, &segments_size, &corrections_size, &signs_size, &errorpoint_size, &calculate_by_total_size, &slope_exponent_max, &slope_significand_max, &file, &list_segments_size, &list_corrections_size, &list_signs_size](auto &index) {
-                            index.segment_init();
-                            for (auto covered : index.seg_covered)
-                                avg_covered += covered;
-                            // slope_exponent_max = std::max(slope_exponent_max, index.segment_slope_exponent_max());
-                            // slope_significand_max = std::max(slope_significand_max, index.segment_slope_significand_max());
-                            segments_count_real += index.segments_size;
+                    for (auto& index : index_partition) {
+                        index.segment_init();
 
-                            list_size += index.n;
-                            list_segments_size += index.segment_size_in_bytes();
-                            list_corrections_size += index.corrections_size_in_bytes();
-                            list_signs_size += index.signs_size_in_bytes();
+                        avg_covered += index.n;
+                        segments_count_real += index.segments_size;
 
-                            segments_size += index.segment_size_in_bytes();
-                            corrections_size += index.corrections_size_in_bytes();
-                            signs_size += index.signs_size_in_bytes();
-                            errorpoint_size += index.errorPointCount;
-                            file << "Epsilon:\t" << index.Epsilon_Data << "\tSegments Count:\t" << index.segments_size << "\tTotal bits per int:\t" << (segments_size + corrections_size + signs_size) * 8 / index.n << std::endl;
-                            // index.normal_clean();
-                            // index.normal_init();
-                            // if (list_count == 12){
-                                // index.report_residual_list(file_r);
-                            // }
-                        }, variant_index);
+                        list_size += index.n;
+                        list_segments_size += index.segment_size_in_bytes();
+                        list_corrections_size += index.corrections_size_in_bytes();
+                        list_signs_size += index.signs_size_in_bytes();
+
+                        segments_size += index.segment_size_in_bytes();
+                        corrections_size += index.corrections_size_in_bytes();
+                        signs_size += index.signs_size_in_bytes();
+                        errorpoint_size += index.errorPointCount;
                     }
                     list_count++;
                     long double total_list_size = list_segments_size + list_corrections_size + list_signs_size;
@@ -223,49 +172,25 @@ namespace lico_sequence
             } else {
                 total_list = index_sequences.size();
                 K list_count = 0;
-                for (auto& variant_index : index_sequences) {
+                for (auto& index : index_sequences) {
                     list_count++;
                     uint64_t list_segments_size = 0, list_corrections_size = 0, list_signs_size = 0, list_size = 0;
-                    std::visit([&output_basename, &is_la_vector, &list_count, &list_size, &avg_covered, &segments_count_real, &segments_size, &corrections_size, &signs_size, &errorpoint_size, &calculate_by_total_size, &slope_exponent_max, &slope_significand_max, &file, &list_segments_size, &list_corrections_size, &list_signs_size](auto &index) {
-                    // index.normal_init();
+
                     index.segment_init();
-                    for (auto &covered : index.seg_covered)
-                        avg_covered += covered;
-                    // slope_exponent_max = std::max(slope_exponent_max, index.segment_slope_exponent_max());
-                    // slope_significand_max = std::max(slope_significand_max, index.segment_slope_significand_max());
+                    avg_covered += index.n;
                     segments_count_real += index.segments_size;
-                    file << "Epsilon:\t" << index.Epsilon_Data << "\tSegments Count:\t" << index.segments_size;
+                    // file << "Epsilon:\t" << index.Epsilon_Data << "\tSegments Count:\t" << index.segments_size;
 
                     list_size = index.n;
-                    list_segments_size =  index.segment_size_in_bytes(is_la_vector);
+                    list_segments_size =  index.segment_size_in_bytes();
                     list_corrections_size = index.corrections_size_in_bytes();
                     list_signs_size = index.signs_size_in_bytes();
 
-                    segments_size += index.segment_size_in_bytes(is_la_vector);
+                    segments_size += index.segment_size_in_bytes();
                     corrections_size += index.corrections_size_in_bytes();
                     signs_size += index.signs_size_in_bytes();
                     errorpoint_size += index.errorPointCount;
 
-
-                    if (list_count == 12 || list_count == 13 || list_count == 14 || list_count == 551 || list_count == 1061 || list_count == 2184 || list_count == 2270){
-                        // std::cerr << list_count;
-                        // index.normal_init();
-
-                        // std::string file_name = output_basename + "_list[" + std::to_string(list_count) + "].bad_statistic_log_residual.txt";
-                        // std::ofstream file_t(file_name);
-                        // index.report_residual_list(file_t);
-                        // file_t.close();
-                    } else if (list_count == 648 || list_count == 964 || list_count == 489 ) {
-                        // std::cerr << list_count;
-                        // index.normal_init();
-
-                        // std::string file_name = output_basename + "_list[" + std::to_string(list_count) + "].good_statistic_log_residual.txt";
-                        // std::ofstream file_t(file_name);
-                        // index.report_residual_list(file_t);
-                        // file_t.close();
-                    }
-
-                }, variant_index);
                     long double total_list_size = list_segments_size + list_corrections_size + list_signs_size;
                     file << "List:\t" << list_count << "\tSegment Size:\t" << list_segments_size << "\tCorrection Size:\t" << list_corrections_size << "\tSign Size:\t" << list_signs_size << "\tList Length:\t" << list_size << "\tTotal bits per int:\t" << total_list_size / list_size * 8.0 << std::endl;
                 }
@@ -285,21 +210,18 @@ namespace lico_sequence
             long double total_size_in_bytes = segments_size + corrections_size + signs_size;
             long double total_size_in_gib = total_size_in_bytes / 1024.0 / 1024.0 / 1024.0;
             std::cerr << "Total Size:\t" << total_size_in_bytes << "\tin bytes,\t" << total_size_in_gib << "\tin GiB,\t" << total_size_in_bytes / data_size << "\tbytes per int:" << std::endl;
-            // std::cerr << "Slope Significand Max:\t" << slope_significand_max << " (" << BIT_WIDTH(slope_significand_max) << ")\tSlope Exponent Max:\t" << slope_exponent_max << " (" << BIT_WIDTH(slope_exponent_max) << ")" << std::endl;
             if (!output_basename.empty()){
-                // std::ofstream file(output_basename + ".statistic_log.txt");
                 file << "Epsilon:\t" << epsilon << std::endl;
                 file << "Integer Count:\t" << data_size << std::endl;
                 file << "Segments count:\t" << segments_count_real << std::endl;
                 file << "Error Point Count:\t" << errorpoint_size << std::endl;
-                // file << "Average Covered:\t" << avg_covered / segments_count << std::endl;
+                file << "Average Covered:\t" << avg_covered / segments_count << std::endl;
                 file << "Average Length:\t" << segments_count / index_sequences.size() << std::endl;
                 file << "Segment Size:\t" << segments_size << "\tbyte" << std::endl;
                 file << "Corrections Size:\t" << corrections_size << "\tbyte" << std::endl;
                 file << "Signs Size:\t" << signs_size << "\tbyte" << std::endl;
                 file << "Compression Ratio:\t" << ratio << std::endl;
                 file << "Total Size:\t" << total_size_in_bytes << "\tin bytes,\t" << total_size_in_gib << "\tin GiB,\t" << total_size_in_bytes / data_size << "\tbytes per int\t" << std::endl;
-                // file << "Slope Significand Max:\t" << slope_significand_max << " (" << BIT_WIDTH(slope_significand_max) << ")\tSlope Exponent Max:\t" << slope_exponent_max << " (" << BIT_WIDTH(slope_exponent_max) << ")" << std::endl;
                 std::cerr << "——Save statistic to: " << output_basename << ".statistic_log.txt——" << std::endl;
             }
         }
@@ -330,24 +252,11 @@ namespace lico_sequence
             std::vector<double> gap_mean;
             std::vector<double> gap_variance;
             K idx = -1;
-            bool save_gap = false;
-            // random select 8 lists
-            // std::vector<K> random_index;
-            // for (K i = 0; i < 8; i++)
-            //     random_index.push_back(rand() % input.size());
             for (size_t i = 2; i < input.size();) {
                 K n = data[i];
                 idx++;
 
-                // if (std::find(random_index.begin(), random_index.end(), idx) != random_index.end())
-                //     save_gap = true;
-                // else
-                //     save_gap = false;
-
                 std::vector<K> sequence(data + i + 1, data + i + n + 1);
-
-                if (save_gap)
-                    file_gap << sequence.size() - 1 << std::endl;
 
                 // statistic gap mean and variance
                 K last = sequence[0];
@@ -355,30 +264,19 @@ namespace lico_sequence
                 uint64_t sum = 0;
                 bool flag = true;
                 for (int j = 1; j < sequence.size(); j++) {
-                    // for (auto value : sequence) {
-                    // if (flag) {
-                    //     flag = false;
-                    //     continue;
-                    // }
                     K value = sequence[j];
                     int gap = value - last;
-
-                    if (save_gap)
-                        file_gap << gap << std::endl;
 
                     sum += gap;
                     gaps.push_back(gap);
                     last = value;
                 }
-                // std::cerr << n << " " <<  sequence.size() << " " << gaps.size() <<  std::endl;
                 double mean = sum / double(gaps.size());
-                // gap_mean.push_back(mean);
                 double variance = 0;
                 for (auto& gap : gaps) {
                     variance += (gap - mean) * (gap - mean);
                 }
                 variance /= gaps.size();
-                // gap_variance.push_back(variance);
 
                 lico_partition* data_partition = new lico_partition(sequence);
                 data_partition -> calculate_max_min_page_gap_variance(file_gap_sta);
@@ -413,27 +311,27 @@ namespace lico_sequence
             if (file.is_open()) {
                 for (auto i : random_index) {
                     int block_idx = rand() % index_partition_sequences[i].size();
-                    auto& variant_index = index_partition_sequences[i][block_idx];
-                    std::visit([&i, &block_idx, &file](auto &index) {
-                        index.normal_init();
+                    auto& index = index_partition_sequences[i][block_idx];
+                    index.normal_init();
 
-                        int segment_idx = rand() % index.segments_size;
-                        file << index.Epsilon_Data << "\t" << i << "\t" << block_idx << "\t" << segment_idx << "\n";
+                    int segment_idx = rand() % index.segments_size;
+                    file << index.Epsilon_Data << "\t" << i << "\t" << block_idx << "\t" << segment_idx << "\n";
 
-                        uint32_t first = 0, covered = index.seg_covered[segment_idx];
-                        file << covered << "\n";
-                        for (int j = 0; j < segment_idx; j++)
-                            first += index.seg_covered[j];
+                    uint32_t first = 0;
+                    // uint32_t covered = segment_idx < index.segments_size - 1 ? index.seg_first[segment_idx + 1] - index.seg_first[segment_idx] : index.n - index.seg_first[segment_idx];
+                    uint32_t covered = index.seg_covered[segment_idx];
+                    file << covered << "\n";
+                    for (uint32_t j = 0; j < segment_idx; j++) {
+                        first += index.seg_covered[j];
+                    }
 
-                        int32_t last_residual = 0;
-                        for (int j = first; j < first + covered; j++) {
-                            int residual_gap = index.corrections_vector[j];
-                            last_residual = residual_gap + last_residual;
-                            uint32_t zigzag_residual_gap = zigzag(residual_gap);
-                            file << last_residual << "\t" << residual_gap << "\t" << zigzag_residual_gap << "\n";
-                        }
-
-                    }, variant_index);
+                    int32_t last_residual = 0;
+                    for (int j = first; j < first + covered; j++) {
+                        int residual_gap = index.corrections_vector[j];
+                        last_residual = residual_gap + last_residual;
+                        uint32_t zigzag_residual_gap = zigzag(residual_gap);
+                        file << last_residual << "\t" << residual_gap << "\t" << zigzag_residual_gap << "\n";
+                    }
                 }
                 file.close();
             }
@@ -451,14 +349,12 @@ namespace lico_sequence
             }
             if (file.is_open()) {
                 for (auto i : random_index) {
-                    auto& variant_index = index_sequences[i];
-                    std::visit([&file](auto &index) {
-                        index.normal_init();
-                        file << index.n << std::endl;
-                        for (auto& correction : index.corrections_vector) {
-                            file << correction << std::endl;
-                        }
-                    }, variant_index);
+                    auto& index = index_sequences[i];
+                    index.normal_init();
+                    file << index.n << std::endl;
+                    for (auto& correction : index.corrections_vector) {
+                        file << correction << std::endl;
+                    }
                 }
                 file.close();
             }
@@ -484,7 +380,9 @@ namespace lico_sequence
 
                     std::vector<K> result_decode(enumerator_tmp.n);
 
+                    // enumerator_tmp.residuals_decode();
                     // enumerator_tmp.normal_decode(result_decode.data());
+
                     enumerator_tmp.simd_init();
                     enumerator_tmp.simd_decode_512i(result_decode.data());
 
@@ -493,7 +391,8 @@ namespace lico_sequence
                     for (auto j = 0; j < result_decode.size(); j++) {
                         if (sequence[j] != result_decode[j]) {
                             data_unequal_test++;
-                            // std::cerr << "Unequal Value: " << result_decode[j] << " " << sequence[j] << " " << posi << " " << j << std::endl;
+                            std::cerr << "Unequal Value: " << result_decode[j] << " " << sequence[j] << " " << sequence.size() << " " << j << std::endl;
+                            exit(0);
                         }
                     }
 
@@ -513,6 +412,8 @@ namespace lico_sequence
                     std::vector<K> sequence(data + i + 1, data + i + n + 1);
                     lico_enumerator<K> enumerator_tmp = create_enumerator_from_single_index<K>(index_sequences[posi++]);
                     std::vector<K> result_decode(enumerator_tmp.n);
+
+                    enumerator_tmp.residuals_decode();
                     enumerator_tmp.normal_decode(result_decode.data());
 
                     assert(result_decode.size() == sequence.size());
@@ -520,9 +421,11 @@ namespace lico_sequence
                     for (auto j = 0; j < result_decode.size(); j++) {
                         if (sequence[j] != result_decode[j]) {
                             data_unequal_test++;
-                            // std::cerr << "Unequal Value: " << result_decode[j] << " " << sequence[j] << " " << posi << " " << j << std::endl;
+                            std::cerr << "Unequal Value: " << result_decode[j] << " " << sequence[j] << " " << sequence.size() << " " << j << std::endl;
+                            exit(0);
                         }
                     }
+
                     i += n + 1;
                 }
             }
@@ -557,16 +460,14 @@ namespace lico_sequence
                 uint32_t index_count = 0;
                 for (const auto& partition : index_partition_sequences) {
                     uint32_t partition_count = 0;
-                    for (const auto& variant_index : partition) {
+                    for (const auto& index : partition) {
                         std::string filename = output_basename + std::to_string(index_count) + "_" + std::to_string(partition_count) + ".idx";
                         std::ofstream out(filename, std::ios::binary);
                         if (!out) {
                             std::cerr << "Error: Cannot open " << filename << " for writing." << std::endl;
                             continue;
                         }
-                        std::visit([&out](const auto& index) {
-                            write_index_data(out, index);
-                        }, variant_index);
+                        write_index_data<LICOIndex>(out, index);
                         out.close();
                         partition_count++;
                     }
@@ -578,16 +479,14 @@ namespace lico_sequence
                 out_header.close();
 
                 K index_count = 0;
-                for (const auto& variant_index : index_sequences) {
+                for (const auto& index : index_sequences) {
                     std::string filename = output_basename + std::to_string(index_count) + ".idx";
                     std::ofstream out(filename, std::ios::binary);
                     if (!out) {
                         std::cerr << "Error: Cannot open " << filename << " for writing." << std::endl;
                         continue;
                     }
-                    std::visit([&out](const auto& index) {
-                        write_index_data(out, index);
-                    }, variant_index);
+                    write_index_data<LICOIndex>(out, index);
                     out.close();
                     index_count++;
                 }
@@ -618,7 +517,7 @@ namespace lico_sequence
                 for (K i = 0; i < index_num; ++i) {
                     size_t partition_size;
                     in_header.read(reinterpret_cast<char*>(&partition_size), sizeof(size_t));
-                    std::vector<LICOVariant> partition;
+                    std::vector<LICOIndex> partition;
                     partition.reserve(partition_size);
 
                     for (size_t j = 0; j < partition_size; ++j) {
@@ -632,39 +531,11 @@ namespace lico_sequence
                         uint32_t Epsilon_Data;
                         in.read(reinterpret_cast<char*>(&Epsilon_Data), sizeof(Epsilon_Data));
 
-                        LICOVariant variant_index;
-                        switch (Epsilon_Data) {
-                            case 1: variant_index = lico::LICO<K, 1>(); break;
-                            case 3: variant_index = lico::LICO<K, 3>(); break;
-                            case 7: variant_index = lico::LICO<K, 7>(); break;
-                            case 15: variant_index = lico::LICO<K, 15>(); break;
-                            case 31: variant_index = lico::LICO<K, 31>(); break;
-                            case 63: variant_index = lico::LICO<K, 63>(); break;
-                            case 127: variant_index = lico::LICO<K, 127>(); break;
-                            case 255: variant_index = lico::LICO<K, 255>(); break;
-                            case 511: variant_index = lico::LICO<K, 511>(); break;
-                            case 1023: variant_index = lico::LICO<K, 1023>(); break;
-                            case 2047: variant_index = lico::LICO<K, 2047>(); break;
-                            case 4095: variant_index = lico::LICO<K, 4095>(); break;
-                            case 8191: variant_index = lico::LICO<K, 8191>(); break;
-                            case 16383: variant_index = lico::LICO<K, 16383>(); break;
-                            case 32767: variant_index = lico::LICO<K, 32767>(); break;
-                            case 65535: variant_index = lico::LICO<K, 65535>(); break;
-                            case 131071: variant_index = lico::LICO<K, 131071>(); break;
-                            case 262143: variant_index = lico::LICO<K, 262143>(); break;
-                            case 524287: variant_index = lico::LICO<K, 524287>(); break;
-                            case 1048575: variant_index = lico::LICO<K, 1048575>(); break;
-                            default:
-                                std::cerr << "Unsupported Epsilon Value: " << Epsilon_Data << std::endl;
-                                continue;
-                        }
+                        LICOIndex index = lico::LICO<K>(Epsilon_Data);
 
-                        std::visit([&in, Epsilon_Data](auto& index) {
-                            index.Epsilon_Data = Epsilon_Data;
-                            read_index_data(in, index);
-                        }, variant_index);
+                        read_index_data<LICOIndex>(in, index);
 
-                        partition.emplace_back(std::move(variant_index));
+                        partition.emplace_back(std::move(index));
                         in.close();
                     }
                     index_partition_sequences.emplace_back(std::move(partition));
@@ -684,39 +555,11 @@ namespace lico_sequence
                     uint32_t Epsilon_Data;
                     in.read(reinterpret_cast<char*>(&Epsilon_Data), sizeof(Epsilon_Data));
 
-                    LICOVariant variant_index;
-                    switch (Epsilon_Data) {
-                        case 1: variant_index = lico::LICO<K, 1>(); break;
-                        case 3: variant_index = lico::LICO<K, 3>(); break;
-                        case 7: variant_index = lico::LICO<K, 7>(); break;
-                        case 15: variant_index = lico::LICO<K, 15>(); break;
-                        case 31: variant_index = lico::LICO<K, 31>(); break;
-                        case 63: variant_index = lico::LICO<K, 63>(); break;
-                        case 127: variant_index = lico::LICO<K, 127>(); break;
-                        case 255: variant_index = lico::LICO<K, 255>(); break;
-                        case 511: variant_index = lico::LICO<K, 511>(); break;
-                        case 1023: variant_index = lico::LICO<K, 1023>(); break;
-                        case 2047: variant_index = lico::LICO<K, 2047>(); break;
-                        case 4095: variant_index = lico::LICO<K, 4095>(); break;
-                        case 8191: variant_index = lico::LICO<K, 8191>(); break;
-                        case 16383: variant_index = lico::LICO<K, 16383>(); break;
-                        case 32767: variant_index = lico::LICO<K, 32767>(); break;
-                        case 65535: variant_index = lico::LICO<K, 65535>(); break;
-                        case 131071: variant_index = lico::LICO<K, 131071>(); break;
-                        case 262143: variant_index = lico::LICO<K, 262143>(); break;
-                        case 524287: variant_index = lico::LICO<K, 524287>(); break;
-                        case 1048575: variant_index = lico::LICO<K, 1048575>(); break;
-                        default:
-                            std::cerr << "Unsupported Epsilon Value: " << Epsilon_Data << std::endl;
-                            continue;
-                    }
+                    LICOIndex index = lico::LICO<K>(Epsilon_Data);
 
-                    std::visit([&in, Epsilon_Data](auto& index) {
-                        index.Epsilon_Data = Epsilon_Data;
-                        read_index_data(in, index);
-                    }, variant_index);
+                    read_index_data<LICOIndex>(in, index);
 
-                    index_sequences.push_back(std::move(variant_index));
+                    index_sequences.push_back(std::move(index));
                     in.close();
                 }
             }

@@ -38,7 +38,7 @@ namespace lico
     #define BIT_CEIL(x) ((x) < 2 ? 1u : 1u << (64u - __builtin_clzll((x) - 1)))
     #define BIT_WIDTH(x) ((x) == 0 ? 0 : 64 - __builtin_clzll(x))
 
-    template <typename K, uint64_t Epsilon = 64>
+    template <typename K>
     class LICO {
 
     public:
@@ -47,19 +47,32 @@ namespace lico
         typedef int32_t Intercept_Value;
         typedef uint32_t Covered_Value;
 
+        typedef int32_t Segment_Value;
+
         uint64_t n;                           ///< The number of elements this index was built on.
         uint32_t Epsilon_Data;                ///< The epsilon value used to build the index.actual it's uint32_t
-        uint8_t bpc_epsilon = BIT_WIDTH(Epsilon);
+        uint8_t bpc_epsilon;
 
-        std::vector<Intercept_Value> seg_intercept;
-        std::vector<uint8_t> seg_slope_exponent;
-        std::vector<int64_t> seg_slope_significand;
+        // std::vector<Segment_Value> seg_delta_x;
+        // std::vector<Segment_Value> seg_delta_y;
+        // std::vector<Segment_Value> seg_y_b;
+        // std::vector<Segment_Value> seg_x_b;
+        std::vector<Segment_Value> seg_s_i;
+        // uint8_t bpc_delta_x, bpc_delta_y, bpc_y_b, bpc_x_b;
+
+        std::vector<Segment_Value> seg_delta_x;
+        std::vector<Segment_Value> seg_delta_y;
+        std::vector<Segment_Value> seg_y_b;
+        std::vector<Segment_Value> seg_x_b;
         std::vector<Covered_Value> seg_covered;
 
-        sdsl::int_vector<64> seg_intercept_compress;
-        sdsl::int_vector<64> seg_slope_exponent_compress;
-        sdsl::int_vector<64> seg_slope_significand_compress;
+
         sdsl::int_vector<64> seg_covered_compress;
+        sdsl::int_vector<64> seg_delta_y_compress;
+        sdsl::int_vector<64> seg_delta_x_compress;
+        sdsl::int_vector<64> seg_y_b_compress;
+        sdsl::int_vector<64> seg_x_b_compress;
+
 
         sdsl::int_vector<64> corrections_none; // corrections for saving, each value <= (epsilon / 4)
         sdsl::bit_vector signs_none; // signs compress for saving
@@ -67,8 +80,10 @@ namespace lico
 
         std::vector<Correction_Value> corrections_vector; // corrections for decode
 
+        Segment_Value first_offset = 0;
+
         uint32_t segments_size;
-        uint8_t bpc_covered, bpc_intercept, bpc_slope_significand, bpc_slope_exponent;
+        uint8_t bpc_covered, bpc_delta_y, bpc_delta_x, bpc_y_b, bpc_x_b;
 
         /// Sentinel value to avoid bounds checking.
         static constexpr K sentinel = std::numeric_limits<K>::has_infinity ? std::numeric_limits<K>::infinity() : std::numeric_limits<K>::max();
@@ -80,14 +95,20 @@ namespace lico
         uint64_t errorPointCount;
 
         LICO(): n(0), errorPointCount(0) {}
+        LICO(uint32_t epsilon) {
+            bpc_epsilon = BIT_WIDTH(epsilon);
+            Epsilon_Data = epsilon;
+        }
 
-        explicit LICO(const std::vector<K>& data) : LICO(data.begin(), data.end()) {}
+        explicit LICO(const std::vector<K>& data, uint32_t epsilon) : LICO(data.begin(), data.end(), epsilon) {}
 
         template <typename RandomIt>
-        LICO(RandomIt begin, RandomIt end):
+        LICO(RandomIt begin, RandomIt end, uint32_t epsilon, Segment_Value first_offset = 0):
+            first_offset(first_offset),
             n(std::distance(begin, end)),
             errorPointCount(0){
-            Epsilon_Data = Epsilon;
+            Epsilon_Data = epsilon;
+            bpc_epsilon = BIT_WIDTH(epsilon);
             corrections_vector.resize(n);
 
 #if RESIDUAL_COMPRESS
@@ -96,7 +117,7 @@ namespace lico
             signs_none.resize(n);
 #endif
 
-            build(begin, end, Epsilon);
+            build(begin, end, epsilon);
 
 #if RESIDUAL_COMPRESS
             if (residual_compress_type == "fastpfor")
@@ -137,17 +158,15 @@ namespace lico
             uint32_t first = cs.get_first_x();
             if (first == n) return;
 
-            // if (seg_covered.size() == 10) {
-            //     std::cerr << "HERE" << std::endl;
-            // }
-
-            auto [cs_significand, cs_exponent, cs_intercept] = cs.get_fixed_point_segment(first, j - i); // fixed point slope and intercept
-
+            auto [delta_y, delta_x, y_b, x_b] = cs.get_lico_segment();
+            x_b += first_offset; // important to add offset
             if (first == n - 1) {
-                seg_intercept.push_back(data[first]);
-                seg_slope_exponent.push_back(0);
-                seg_slope_significand.push_back(0);
                 seg_covered.push_back(1);
+                seg_delta_x.push_back(1);
+                seg_delta_y.push_back(0);
+                seg_x_b.push_back(first + first_offset);
+                seg_y_b.push_back(data[first]);
+
 
 #if RESIDUAL_COMPRESS
                 corrections_vector[first] = 0;
@@ -159,95 +178,124 @@ namespace lico
 
 
             seg_covered.push_back(j - i);
-            seg_intercept.push_back(cs_intercept);
-            seg_slope_exponent.push_back(cs_exponent);
-            seg_slope_significand.push_back(cs_significand);
+            seg_s_i.push_back(first);
+            seg_delta_x.push_back(delta_x);
+            seg_delta_y.push_back(delta_y);
+            seg_x_b.push_back(x_b);
+            seg_y_b.push_back(y_b);
 
+//
 #if RESIDUAL_COMPRESS
-                int64_t last_correction = 0;
-                for (Covered_Value p = first; p < j; p++) {
-                    int64_t error = static_cast<int64_t> (data[p]) - seg_approximate(p, first, cs_exponent, cs_significand, cs_intercept);
-                    int64_t error_diff = error - last_correction;
-                    corrections_vector[p] = error_diff;
-                    last_correction = error;
-                }
+            int32_t last_correction = 0;
+            for (Covered_Value p = first; p < j; p++) {
+                // int64_t error = static_cast<int64_t> (data[p]) - seg_approximate(p, first, cs_exponent, cs_significand, cs_intercept);
+                int64_t error = static_cast<int64_t> (data[p]) -  seg_approximate(delta_y, delta_x,  y_b, x_b, p + first_offset);
+                int32_t error_diff = error - last_correction;
+                corrections_vector[p] = error_diff;
+                last_correction = error;
+            }
 #else
-                uint64_t* corrections_ptr = corrections_none.data();
-                sdsl::bit_vector& signs_ptr = signs_none;
+            uint64_t* corrections_ptr = corrections_none.data();
+            sdsl::bit_vector& signs_ptr = signs_none;
 
-                for (Covered_Value p = first; p < j; p++) {
-                    int64_t error = static_cast<int64_t> (data[p]) - seg_approximate(p, first, cs_exponent, cs_significand, cs_intercept);
-                    uint8_t sign_value = error >= 0 ? 0 : 1;
-                    error = std::abs(error);
-                    if (error <= Epsilon)
-                        set_correction(corrections_ptr, p, error, sign_value, signs_ptr);
-                    else if (error == Epsilon + 1 && sign_value == 0) // use -0 to represent error = epsilon
-                        set_correction(corrections_ptr, p, 0, 1, signs_ptr);
-                    else
-                        std::cerr << "Error: error = -epsilon: " << error << " " << sign_value << std::endl;
-                }
+            for (Covered_Value p = first; p < j; p++) {
+                int64_t error = static_cast<int64_t> (data[p]) -  seg_approximate(delta_y, delta_x,  y_b, x_b, p + first_offset);
+                uint8_t sign_value = error >= 0 ? 0 : 1;
+                error = std::abs(error);
+                if (error <= Epsilon_Data)
+                    set_correction(corrections_ptr, p, error, sign_value, signs_ptr);
+                else
+                    std::cerr << "Error: error epsilon: " << error << " " << (sign_value == 0 ? 1 : -1)  << std::endl;
+            }
 #endif
+        }
+
+        int64_t seg_approximate(Segment_Value delta_y, Segment_Value delta_x, Segment_Value y_b, Segment_Value x_b, Segment_Value j) {
+            int64_t result = static_cast<int64_t> (delta_y) * (j - x_b) + (delta_x / 2) * (j > x_b ? 1 : j == x_b ? 0 : -1);
+            result /= delta_x;
+            result += y_b;
+            return result;
         }
 
         void segments_compress() {
             segments_size = seg_covered.size();
             auto max_iter_1 = std::max_element(seg_covered.begin(), seg_covered.end());
             bpc_covered = BIT_WIDTH(*max_iter_1);
-            auto max_iter_2 = std::max_element(seg_intercept.begin(), seg_intercept.end());
-            bpc_intercept = BIT_WIDTH(*max_iter_2);
-            auto max_iter_3 = std::max_element(seg_slope_significand.begin(), seg_slope_significand.end());
-            bpc_slope_significand = BIT_WIDTH(*max_iter_3);
-            auto max_iter_4 = std::max_element(seg_slope_exponent.begin(), seg_slope_exponent.end());
-            bpc_slope_exponent = BIT_WIDTH(*max_iter_4);
+            auto max_iter_2 = std::max_element(seg_delta_y.begin(), seg_delta_y.end());
+            bpc_delta_y = BIT_WIDTH(*max_iter_2);
+            auto max_iter_3 = std::max_element(seg_delta_x.begin(), seg_delta_x.end());
+            bpc_delta_x = BIT_WIDTH(*max_iter_3);
+            auto max_iter_4 = std::max_element(seg_y_b.begin(), seg_y_b.end());
+            bpc_y_b = BIT_WIDTH(*max_iter_4);
+            auto max_iter_5 = std::max_element(seg_x_b.begin(), seg_x_b.end());
+            bpc_x_b = BIT_WIDTH(*max_iter_5);
+
 
             seg_covered_compress.resize((segments_size * bpc_covered + 63) >> 6);
-            seg_intercept_compress.resize((segments_size * bpc_intercept + 63) >> 6);
-            seg_slope_significand_compress.resize((segments_size * bpc_slope_significand + 63) >> 6);
-            seg_slope_exponent_compress.resize((segments_size * bpc_slope_exponent + 63) >> 6);
+            seg_delta_y_compress.resize((segments_size * bpc_delta_y + 63) >> 6);
+            seg_delta_x_compress.resize((segments_size * bpc_delta_x + 63) >> 6);
+            seg_y_b_compress.resize((segments_size * bpc_y_b + 63) >> 6);
+            seg_x_b_compress.resize((segments_size * bpc_x_b + 63) >> 6);
+
+            // for (int i = 1; i < seg_covered.size(); i++) {
+            //     if (seg_intercept[i] <= seg_intercept[i - 1]) {
+            //         std::cerr << "Error: intercept not increasing: " << seg_intercept[i] << " " << seg_intercept[i - 1] << std::endl;
+            //     }
+            // }
 
             for (int i = 0; i < seg_covered.size(); i++) {
                 auto covered = seg_covered[i];
                 set_segment_compress(seg_covered_compress.data(), i, covered, bpc_covered);
-                auto intercept = seg_intercept[i];
-                set_segment_compress(seg_intercept_compress.data(), i, intercept, bpc_intercept);
-                auto slope_significand = seg_slope_significand[i];
-                set_segment_compress(seg_slope_significand_compress.data(), i, slope_significand, bpc_slope_significand);
-                auto slope_exponent = seg_slope_exponent[i];
-                set_segment_compress(seg_slope_exponent_compress.data(), i, slope_exponent, bpc_slope_exponent);
+                auto delta_y = seg_delta_y[i];
+                set_segment_compress(seg_delta_y_compress.data(), i, delta_y, bpc_delta_y);
+                auto delta_x = seg_delta_x[i];
+                set_segment_compress(seg_delta_x_compress.data(), i, delta_x, bpc_delta_x);
+                auto y_b = seg_y_b[i];
+                set_segment_compress(seg_y_b_compress.data(), i, y_b, bpc_y_b);
+                auto x_b = seg_x_b[i];
+                set_segment_compress(seg_x_b_compress.data(), i, x_b, bpc_x_b);
             }
             // clear the original segments
             seg_covered.clear();
-            seg_intercept.clear();
-            seg_slope_significand.clear();
-            seg_slope_exponent.clear();
+            seg_delta_y.clear();
+            seg_delta_x.clear();
+            seg_y_b.clear();
+            seg_x_b.clear();
+
             corrections_vector.clear();
             std::vector<Covered_Value>().swap(seg_covered);
-            std::vector<Intercept_Value>().swap(seg_intercept);
-            std::vector<int64_t>().swap(seg_slope_significand);
-            std::vector<uint8_t>().swap(seg_slope_exponent);
+            std::vector<Segment_Value>().swap(seg_delta_y);
+            std::vector<Segment_Value>().swap(seg_delta_x);
+            std::vector<Segment_Value>().swap(seg_y_b);
+            std::vector<Segment_Value>().swap(seg_x_b);
             std::vector<Correction_Value>().swap(corrections_vector);
         }
+
 
         void free_memory() {
             std::vector<Covered_Value>().swap(seg_covered);
-            std::vector<Intercept_Value>().swap(seg_intercept);
-            std::vector<int64_t>().swap(seg_slope_significand);
-            std::vector<uint8_t>().swap(seg_slope_exponent);
+            std::vector<Segment_Value>().swap(seg_delta_y);
+            std::vector<Segment_Value>().swap(seg_delta_x);
+            std::vector<Segment_Value>().swap(seg_y_b);
+            std::vector<Segment_Value>().swap(seg_x_b);
+
             std::vector<Correction_Value>().swap(corrections_vector);
         }
 
-        int64_t seg_approximate(uint32_t i, uint32_t first, uint8_t exponent, int64_t significand, int32_t intercept) const {
-            return (int64_t(significand * (i - first)) >> exponent) + intercept;
-        }
+
+
+        // int64_t seg_approximate(uint32_t i, uint32_t first, uint8_t exponent, int64_t significand, int32_t intercept) const {
+        //     return (int64_t(significand * (i - first)) >> exponent) + intercept;
+        // }
 
         uint64_t segment_slope_significand_max() const {
-            auto max_iter = std::max_element(seg_slope_significand.begin(), seg_slope_significand.end());
+            auto max_iter = std::max_element(seg_y_b.begin(), seg_y_b.end());
             uint64_t max_slope_significand = *max_iter;
             return max_slope_significand;
         }
 
         uint32_t segment_slope_exponent_max() const {
-            auto max_iter = std::max_element(seg_slope_exponent.begin(), seg_slope_exponent.end());
+            auto max_iter = std::max_element(seg_delta_y.begin(), seg_delta_y.end());
             uint32_t max_slope_exponent = *max_iter;
             return max_slope_exponent;
         }
@@ -262,14 +310,11 @@ namespace lico
         }
 
         uint64_t ground_truth_build_size_in_bytes() const {
-            return (double(segments_size) * 17.0)  + sizeof(uint8_t) + corrections_size_in_bytes() + signs_size_in_bytes();
+            return (double(segments_size) * 20.0)  + sizeof(uint8_t) + corrections_size_in_bytes() + signs_size_in_bytes();
         }
 
-        uint64_t segment_size_in_bytes(bool is_la_vector=false) const {
-            if (is_la_vector)
-                return (double(segments_size) * 16.0 + sizeof(uint8_t)); // for la_vector, one segment need a 64 bit floating slope, 32 bit intercept, 32 bit breakpoint
-            else
-                return ((seg_covered_compress.bit_size() + seg_intercept_compress.bit_size() + seg_slope_significand_compress.bit_size() + seg_slope_exponent_compress.bit_size()) / CHAR_BIT) + sizeof(uint8_t); //here uint8_t represents the byte need for Epsilon_Data, actually it's only need 8 bit, but we store it as u32 for convenient
+        uint64_t segment_size_in_bytes() const {
+            return ((seg_covered_compress.bit_size() + seg_delta_y_compress.bit_size() + seg_delta_x_compress.bit_size() + seg_y_b_compress.bit_size() + seg_x_b_compress.bit_size()) / CHAR_BIT) + sizeof(uint8_t); //here uint8_t represents the byte need for Epsilon_Data, actually it's only need 8 bit, but we store it as u32 for convenient
         }
 
         uint64_t corrections_size_in_bytes() const {
@@ -312,15 +357,18 @@ namespace lico
 
         void segment_init() {
             seg_covered.resize(segments_size);
-            seg_intercept.resize(segments_size);
-            seg_slope_significand.resize(segments_size);
-            seg_slope_exponent.resize(segments_size);
+            seg_delta_y.resize(segments_size);
+            seg_delta_x.resize(segments_size);
+            seg_y_b.resize(segments_size);
+            seg_x_b.resize(segments_size);
+
 
             for (int i = 0; i < segments_size; i++) {
                 seg_covered[i] = get_segment_compress(seg_covered_compress.data(), i, bpc_covered);
-                seg_intercept[i] = get_segment_compress(seg_intercept_compress.data(), i, bpc_intercept);
-                seg_slope_significand[i] = get_segment_compress(seg_slope_significand_compress.data(), i, bpc_slope_significand);
-                seg_slope_exponent[i] = get_segment_compress(seg_slope_exponent_compress.data(), i, bpc_slope_exponent);
+                seg_delta_y[i] = get_segment_compress(seg_delta_y_compress.data(), i, bpc_delta_y);
+                seg_delta_x[i] = get_segment_compress(seg_delta_x_compress.data(), i, bpc_delta_x);
+                seg_y_b[i] = get_segment_compress(seg_y_b_compress.data(), i, bpc_y_b);
+                seg_x_b[i] = get_segment_compress(seg_x_b_compress.data(), i, bpc_x_b);
             }
         }
 
@@ -357,16 +405,71 @@ namespace lico
 
         void normal_clean() {
             seg_covered.clear();
-            seg_intercept.clear();
-            seg_slope_significand.clear();
-            seg_slope_exponent.clear();
+            seg_delta_x.clear();
+            seg_y_b.clear();
+            seg_delta_y.clear();
             corrections_vector.clear();
             std::vector<Covered_Value>().swap(seg_covered);
-            std::vector<Intercept_Value>().swap(seg_intercept);
-            std::vector<int64_t>().swap(seg_slope_significand);
-            std::vector<uint8_t>().swap(seg_slope_exponent);
+            std::vector<Segment_Value>().swap(seg_delta_y);
+            std::vector<Segment_Value>().swap(seg_delta_x);
+            std::vector<Segment_Value>().swap(seg_y_b);
+            std::vector<Segment_Value>().swap(seg_x_b);
             std::vector<Correction_Value>().swap(corrections_vector);
         }
+
+        //         std::vector<K> normal_decode() {
+        //     std::vector<K> output;
+        //     output.resize(n);
+        //     uint32_t pointer = 0;
+        //
+        //     residual_init();
+        //
+        //     int last_first = 0;
+        //     for (uint32_t i= 0; i < segments_size; i++) {
+        //         auto covered = seg_covered[i];
+        //         auto delta_y = seg_delta_y[i];
+        //         auto delta_x = seg_delta_x[i];
+        //         auto delta_x_divide = delta_x >> 1;
+        //         auto y_b = seg_y_b[i];
+        //         auto x_b = seg_x_b[i];
+        //
+        //         int32_t last_correction = y_b +  corrections_vector[pointer];
+        //
+        //         // if (i == segments_size - 1 && covered == 1) {
+        //         //     std::cerr << "Here" << std::endl;
+        //         // }
+        //
+        //         int32_t j = last_first;
+        //         int64_t result = (static_cast<int64_t> (delta_y) * (j - x_b) + (delta_x_divide) * (j > x_b ? 1 : j == x_b ? 0 : -1));
+        //         output[pointer++] = result / delta_x + last_correction;
+        //         for (j = last_first + 1; j < last_first + covered; ++j) {
+        //             last_correction = last_correction + corrections_vector[pointer];
+        //
+        //             // int64_t other_result = delta_y * (j - x_b) + (delta_x / 2) * (j > x_b ? 1 : j == x_b ? 0 : -1);
+        //             // other_result /= delta_x;
+        //
+        //             // result += delta_y + (delta_x_divide) * (j == x_b - 1 ? 1 : j == x_b ? 1 : 0) ;
+        //             result += delta_y + (delta_x_divide) * (j == x_b ? 1 : j == x_b + 1 ? 1 : 0) ;
+        //
+        //             // if (result > INT32_MAX) {
+        //             //     std::cerr << "Correction value is too big: " << result << std::endl;
+        //             // }
+        //
+        //             // if (other_result != result) {
+        //             //     exit(0);
+        //             //     // std::cerr << " Here" << std::endl;
+        //             // }
+        //             // result /= delta_x;
+        //             // result += last_correction;
+        //             output[pointer++] = result / delta_x + last_correction;
+        //             // output[pointer] = ((j * significand) >> exponent) + last_correction;
+        //             // pointer++;
+        //         }
+        //         last_first += covered;
+        //     }
+        //
+        //     return output;
+        // }
 
         std::vector<K> normal_decode() {
             std::vector<K> output;
@@ -375,18 +478,30 @@ namespace lico
 
             residual_init();
 
+            int32_t last_first = 0;
             for (uint32_t i= 0; i < segments_size; i++) {
-                auto covered = seg_covered[i];
-                auto significand = seg_slope_significand[i];
-                auto exponent = seg_slope_exponent[i];
-                auto intercept = seg_intercept[i];
+                const auto covered = seg_covered[i];
+                const auto delta_y = seg_delta_y[i];
+                const auto delta_x = seg_delta_x[i];
+                const auto delta_x_divide = delta_x >> 1;
+                const auto y_b = seg_y_b[i];
+                const auto x_b = seg_x_b[i];
 
-                int32_t last_correction = intercept;
-                for (int j = 0; j < covered; ++j) {
+                int32_t last_correction = y_b +  corrections_vector[pointer];
+
+                int32_t j = last_first + first_offset;
+                int64_t result = (static_cast<int64_t> (delta_y) * (j - x_b) + (delta_x_divide) * (j > x_b ? 1 : j == x_b ? 0 : -1));
+                output[pointer++] = result / delta_x + last_correction;
+                j++;
+                while (j < last_first + covered + first_offset) {
                     last_correction = last_correction + corrections_vector[pointer];
-                    output[pointer] = ((j * significand) >> exponent) + last_correction;
-                    pointer++;
+
+                    result += delta_y + (delta_x_divide) * (j == x_b ? 1 : j == x_b + 1 ? 1 : 0) ;
+
+                    output[pointer++] = result / delta_x + last_correction;
+                    j++;
                 }
+                last_first += covered;
             }
 
             return output;
@@ -419,7 +534,7 @@ namespace lico
             uint64_t idx = get_correction_bit_offset(i, bpc_epsilon);
             uint64_t correction = sdsl::bits::read_int(corrections_compress_val + (idx >> 6u), idx & 0x3f, bpc_epsilon);
             if (correction == 0 && signs_ptr[i] == 1)
-                return Epsilon + 1;
+                return Epsilon_Data + 1;
             return signs_ptr[i] == 0 ? correction : -correction;
         }
 

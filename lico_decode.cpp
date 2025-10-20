@@ -39,7 +39,7 @@ int main(int argc, const char** argv)
     // residual_compress_type = argv[7];
     uint32_t epsilon = static_cast<uint32_t>(std::stoi(epsilonstr));
 
-    if (index_type == "pgm")
+    if (index_type == "lico")
         switch (epsilon)
         {
             case 0: test_collection_lico<0> (input_basename, output_basename); break;

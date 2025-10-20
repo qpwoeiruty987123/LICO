@@ -4,9 +4,7 @@
 #include <vp2union.hpp>
 #include <lico_index.hpp>
 #include <lico_index_enumerate.hpp>
-
-
-#include "../external/mm_file/include/mm_file/mm_file.hpp"
+#include <mm_file.hpp>
 
 namespace lico_sequence {
     template <typename K, uint64_t epsilon = 64> // K is uint32_t or uint64_t, Floating is unused
@@ -65,7 +63,7 @@ namespace lico_sequence {
                     in_header.read(reinterpret_cast<char*>(&partition_size), sizeof(partition_size));
                     auto it = std::find(idx_list.begin(), idx_list.end(), i);
                     if (it != idx_list.end()) {
-                        std::vector<LICOVariant> partition_index;
+                        std::vector<LICOIndex> partition_index;
                         partition_index.reserve(partition_size);
 
                         for (size_t j = 0; j < partition_size; ++j) {
@@ -79,37 +77,9 @@ namespace lico_sequence {
                             uint32_t Epsilon_Data;
                             in.read(reinterpret_cast<char*>(&Epsilon_Data), sizeof(Epsilon_Data));
 
-                            LICOVariant variant_index;
-                            switch (Epsilon_Data) {
-                                case 1: variant_index = lico::LICO<K, 1>(); break;
-                                case 3: variant_index = lico::LICO<K, 3>(); break;
-                                case 7: variant_index = lico::LICO<K, 7>(); break;
-                                case 15: variant_index = lico::LICO<K, 15>(); break;
-                                case 31: variant_index = lico::LICO<K, 31>(); break;
-                                case 63: variant_index = lico::LICO<K, 63>(); break;
-                                case 127: variant_index = lico::LICO<K, 127>(); break;
-                                case 255: variant_index = lico::LICO<K, 255>(); break;
-                                case 511: variant_index = lico::LICO<K, 511>(); break;
-                                case 1023: variant_index = lico::LICO<K, 1023>(); break;
-                                case 2047: variant_index = lico::LICO<K, 2047>(); break;
-                                case 4095: variant_index = lico::LICO<K, 4095>(); break;
-                                case 8191: variant_index = lico::LICO<K, 8191>(); break;
-                                case 16383: variant_index = lico::LICO<K, 16383>(); break;
-                                case 32767: variant_index = lico::LICO<K, 32767>(); break;
-                                case 65535: variant_index = lico::LICO<K, 65535>(); break;
-                                case 131071: variant_index = lico::LICO<K, 131071>(); break;
-                                case 262143: variant_index = lico::LICO<K, 262143>(); break;
-                                case 524287: variant_index = lico::LICO<K, 524287>(); break;
-                                case 1048575: variant_index = lico::LICO<K, 1048575>(); break;
-                                default:
-                                    std::cerr << "Unsupported Epsilon Value: " << Epsilon_Data << std::endl;
-                                    continue;
-                            }
+                            LICOIndex variant_index = lico::LICO<K>(Epsilon_Data);
 
-                            std::visit([&in, Epsilon_Data](auto& index) {
-                                index.Epsilon_Data = Epsilon_Data;
-                                read_index_data(in, index);
-                            }, variant_index);
+                            read_index_data(in, variant_index);
 
                             partition_index.push_back(std::move(variant_index));
                             in.close();
@@ -141,31 +111,9 @@ namespace lico_sequence {
                     uint32_t Epsilon_Data;
                     in.read(reinterpret_cast<char*>(&Epsilon_Data), sizeof(Epsilon_Data));
 
-                    LICOVariant variant_index;
-                    switch (Epsilon_Data) {
-                        case 1: variant_index = lico::LICO<K, 1>(); break;
-                        case 3: variant_index = lico::LICO<K, 3>(); break;
-                        case 7: variant_index = lico::LICO<K, 7>(); break;
-                        case 15: variant_index = lico::LICO<K, 15>(); break;
-                        case 31: variant_index = lico::LICO<K, 31>(); break;
-                        case 63: variant_index = lico::LICO<K, 63>(); break;
-                        case 127: variant_index = lico::LICO<K, 127>(); break;
-                        case 255: variant_index = lico::LICO<K, 255>(); break;
-                        case 511: variant_index = lico::LICO<K, 511>(); break;
-                        case 1023: variant_index = lico::LICO<K, 1023>(); break;
-                        case 2047: variant_index = lico::LICO<K, 2047>(); break;
-                        case 4095: variant_index = lico::LICO<K, 4095>(); break;
-                        case 8191: variant_index = lico::LICO<K, 8191>(); break;
-                        case 16383: variant_index = lico::LICO<K, 16383>(); break;
-                        default:
-                            std::cerr << "Unsupported Epsilon Value: " << Epsilon_Data << std::endl;
-                            continue;
-                    }
+                    LICOIndex variant_index = lico::LICO<K>(Epsilon_Data);
 
-                    std::visit([&in, Epsilon_Data](auto& index) {
-                        index.Epsilon_Data = Epsilon_Data;
-                        read_index_data(in, index);
-                    }, variant_index);
+                    read_index_data(in, variant_index);
 
                     in.close();
 
@@ -199,67 +147,6 @@ namespace lico_sequence {
                 }
             }
             return out - intersect_start;
-        }
-
-        static uint32_t intersect_u32_simd_basic(uint32_t const* shorter, uint32_t const* longer, uint32_t shorter_length, uint32_t longer_length, uint32_t * out) {
-            uint32_t intersection_count = 0;
-            uint32_t shorter_idx = 0, longer_idx = 0;
-            uint32_t longer_load_size;
-            __mmask16 longer_mask;
-
-            while (shorter_idx < shorter_length && longer_idx < longer_length) {
-                // Load `shorter_member` and broadcast it to shorter vector, load `longer_members_vec` from memory.
-                uint32_t longer_remaining = longer_length - longer_idx;
-                uint32_t shorter_member = shorter[shorter_idx];
-                __m512i shorter_member_vec = _mm512_set1_epi32(*(int*)&shorter_member);
-                __m512i longer_members_vec;
-                if (longer_remaining < 16) {
-                    longer_load_size = longer_remaining;
-                    longer_mask = (__mmask16)_bzhi_u32(0xFFFF, longer_remaining);
-                } else {
-                    longer_load_size = 16;
-                    longer_mask = 0xFFFF;
-                }
-                longer_members_vec = _mm512_maskz_loadu_epi32(longer_mask, (__m512i const*)(longer + longer_idx));
-
-                // Compare `shorter_member` with each element in `longer_members_vec`,
-                // and jump to the position of the match. There can be only one match at most!
-                __mmask16 equal_mask = _mm512_mask_cmpeq_epu32_mask(longer_mask, shorter_member_vec, longer_members_vec);
-                bool equal_count = equal_mask != 0;
-                if (equal_count) {
-                    out[intersection_count++] = shorter_member;
-                }
-
-                // When comparing a scalar against a sorted array, we can find three types of elements:
-                // - entries that scalar is greater than,
-                // - entries that scalar is equal to,
-                // - entries that scalar is less than,
-                // ... in that order! Any of them can be an empty set.
-                __mmask16 greater_mask = _mm512_mask_cmplt_epu32_mask(longer_mask, longer_members_vec, shorter_member_vec);
-                uint32_t greater_count = _mm_popcnt_u32(greater_mask);
-                uint32_t smaller_exists = longer_load_size > greater_count - equal_count;
-
-                // Advance the first array:
-                // - to the next element, if a match was found,
-                // - to the next element, if the current element is smaller than any elements in the second array.
-                shorter_idx += equal_count | smaller_exists;
-                // Advance the second array:
-                // - to the next element after match, if a match was found,
-                // - to the first element that is greater than the current element in the first array, if no match was found.
-                longer_idx += greater_count + equal_count;
-
-                // At any given cycle, take one entry from shorter array and compare it with multiple from the longer array.
-                // For that, we need to swap the arrays if necessary.
-                if ((shorter_length - shorter_idx) > (longer_length - longer_idx)) {
-                    uint32_t const* temp_array = shorter;
-                    shorter = longer, longer = temp_array;
-                    uint32_t temp_length = shorter_length;
-                    shorter_length = longer_length, longer_length = temp_length;
-                    uint32_t temp_idx = shorter_idx;
-                    shorter_idx = longer_idx, longer_idx = temp_idx;
-                }
-            }
-            return intersection_count;
         }
 
         static uint32_t intersect_u32_simd(uint32_t const* a, uint32_t const* b, uint32_t a_length, uint32_t b_length, uint32_t *out) {
@@ -315,7 +202,6 @@ namespace lico_sequence {
 
             // Handle the tail:
             c += intersect_u32_normal(a, b, a_end - a, b_end - b, out + c);
-            // result += c; // And merge it with the main body result
             return c;
         }
 
@@ -344,6 +230,7 @@ namespace lico_sequence {
 
                     std::sort(index_sequences.begin(), index_sequences.end(), [](const lico_enumerator <K> &a, const lico_enumerator <K> &b) {return a.n < b.n;});
 
+                    // int branch_num = query.size() == 2 ? 2 : query.size() == 3 ? 3 : 4;
                     int branch_num = query.size() == 2 ? 2 : 3;
 
                     for (int i = 0; i < branch_num; i++) {
@@ -354,23 +241,18 @@ namespace lico_sequence {
                     uint32_t candidate_posting = 0;
                     uint32_t equal_result = 0;
                     uint32_t candidate_posting_tmp = 0;
-                    int intersection_size = query.size() == 2 ? index_sequences[1].n + 1 : index_sequences[2].n + 1;
 
                     K *intersection_result_p1, *intersection_result_p2;
-                    std::vector<K, HugePageAllocator<K>> intersection_result_1(intersection_size); // for simd
-                    std::vector<K, HugePageAllocator<K>> intersection_result_2(intersection_size);
-                    // std::vector<K> intersection_result_1(intersection_size); // for normal
-                    // std::vector<K> intersection_result_2(intersection_size);
+#if USE_HUGEPAGE
+                    std::vector<K, HugePageAllocator<K>> intersection_result_1(universe_size); // for simd
+                    std::vector<K, HugePageAllocator<K>> intersection_result_2(universe_size);
+#else
+                    std::vector<K> intersection_result_1(universe_size); // for normal
+                    std::vector<K> intersection_result_2(universe_size);
+#endif
                     intersection_result_p1 = intersection_result_1.data();
                     intersection_result_p2 = intersection_result_2.data();
 
-                    // warm up
-                    for (auto k = 0; k < 5; k++) {
-                        for (auto i = 0;i < intersection_size; i++)
-                            intersection_result_p2[i] = i + 1;
-                        for (auto i = 0;i < intersection_size; i++)
-                            intersection_result_p1[i] = i + 1;
-                    }
 
                     avg_time_per = 0;
 
@@ -412,6 +294,18 @@ namespace lico_sequence {
                         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
                         avg_time_per += duration.count();
 
+                        if (branch_num > 3) {
+                            index_sequences[3].decode_query(intersection_result_p2, decode_type);
+                            avg_time_per += index_sequences[3].total_duration;
+
+                            start = std::chrono::high_resolution_clock::now();
+                            equal_result = intersect_u32_simd(intersection_result_p1, intersection_result_p2, equal_result, index_sequences[3].n, intersection_result_p1);
+                            end = std::chrono::high_resolution_clock::now();
+                            duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+                            avg_time_per += duration.count();
+
+                        }
+
                         // next_geq candidate
                         if (index_sequences.size() > branch_num) {
                             for (query_id_idx = 3; query_id_idx < index_sequences.size(); query_id_idx++) {
@@ -425,6 +319,7 @@ namespace lico_sequence {
                             bool found = true;
 
                             start = std::chrono::high_resolution_clock::now();
+
                             while (intersection_idx < intersection_length) {
                                 candidate_posting = intersection_result_p1[intersection_idx];
                                 for (query_id_idx = 3; query_id_idx < index_sequences.size(); query_id_idx++) {
@@ -502,34 +397,24 @@ namespace lico_sequence {
 
                     std::sort(index_sequences.begin(), index_sequences.end(), [](const lico_enumerator <K> &a, const lico_enumerator <K> &b) {return a.n < b.n;});
 
-                    uint64_t union_size = 0, union_list_size = 0;
                     for (int i = 0; i < query.size(); i++) {
                         index_sequences[i].query_init(decode_type, "union");
-                        union_size += index_sequences[i].n;
-                        union_list_size = index_sequences[i].n > union_list_size ? index_sequences[i].n : union_list_size;
                     }
 
                     uint64_t equal_result = 0;
                     K *union_result_p1, *union_result_p2, *union_result_p3;
-                    std::vector<K, HugePageAllocator<K>>  union_result_1(union_list_size); // for simd
-                    std::vector<K, HugePageAllocator<K>>  union_result_2(union_size);
-                    std::vector<K, HugePageAllocator<K>>  union_result_3(union_size);
-                    // std::vector<K> union_result_1(union_list_size); // for normal
-                    // std::vector<K> union_result_2(union_size);
-                    // std::vector<K> union_result_3(union_size);
+#if USE_HUGEPAGE
+                    std::vector<K, HugePageAllocator<K>>  union_result_1(universe_size); // for simd
+                    std::vector<K, HugePageAllocator<K>>  union_result_2(universe_size);
+                    std::vector<K, HugePageAllocator<K>>  union_result_3(universe_size);
+# else
+                    std::vector<K> union_result_1(universe_size); // for normal
+                    std::vector<K> union_result_2(universe_size);
+                    std::vector<K> union_result_3(universe_size);
+#endif
                     union_result_p1 = union_result_1.data();
                     union_result_p2 = union_result_2.data();
                     union_result_p3 = union_result_3.data();
-
-                    // warm up
-                    for (auto k = 0; k < 5; k++) {
-                        for (auto i = 0;i < union_size; i++)
-                            union_result_p3[i] = 0;
-                        for (auto i = 0;i < union_size; i++)
-                            union_result_p2[i] = 0;
-                        for (auto i = 0;i < union_list_size; i++)
-                            union_result_p1[i] = 0;
-                    }
 
                     avg_time_per = 0;
 
@@ -572,7 +457,6 @@ namespace lico_sequence {
                             K *union_result_tmp = union_result_p2;
                             union_result_p2 = union_result_p3;
                             union_result_p3 = union_result_tmp;
-                            // end_union_result = std::set_union(start_union_result, start_union_result + equal_result, index_sequences[i].current_value_vector.data(), index_sequences[i].current_value_vector.data()+index_sequences[i].n, start_union_result);
                         }
                     }
 
@@ -633,191 +517,6 @@ namespace lico_sequence {
             equal_result = intersection_result_p1 - intersection_start;
         }
 
-        void query_test_intersection_benchmark(const std::vector<std::vector<uint32_t>> &query_list) {
-            std::vector<uint64_t> querys_per_times;
-            uint64_t avg_time_per = 0;
-            uint64_t avg_time_round = 0;
-            K repeat_num = 5;
-
-            for (K repeat = 0; repeat < repeat_num + 1; repeat++) {
-                uint64_t total = 0;
-                int32_t query_id = 0;
-                avg_time_round = 0;
-                for (auto &query : query_list) {
-                    query_id++;
-                    if (query.size() < 2)
-                        continue;
-
-                    std::vector<lico_enumerator <K>> index_sequences = load_model(query);
-
-                    std::sort(index_sequences.begin(), index_sequences.end(), [](const lico_enumerator <K> &a, const lico_enumerator <K> &b) {return a.n < b.n;});
-
-                    uint32_t query_id_idx = 0;
-                    uint32_t equal_result = 0;
-                    uint32_t candidate_posting_tmp = 0;
-                    const uint32_t m = index_sequences.size();
-                    int32_t intersection_size = query.size() == 2 ? index_sequences[1].n + 1 : index_sequences[2].n + 1;
-
-                    K *intersection_result_p1;
-                    // std::vector<K, HugePageAllocator<K>> intersection_result_1(intersection_size); // for simd
-                    // std::vector<K, HugePageAllocator<K>> intersection_result_2(intersection_size);
-                    std::vector<K> intersection_result_1(intersection_size); // for normal
-                    // std::vector<K> intersection_result_2(intersection_size);
-                    intersection_result_p1 = intersection_result_1.data();
-                    // intersection_result_p2 = intersection_result_2.data();
-
-                    // warm up
-                    for (auto k = 0; k < 5; k++) {
-                        for (auto i = 0;i < intersection_size; i++)
-                            intersection_result_p1[i] = i + 1 + k;
-                    }
-
-                    avg_time_per = 0;
-
-                    for (int32_t i = 0; i < index_sequences.size(); i++) {
-                        index_sequences[i].next_geq_init();
-                        avg_time_per += index_sequences[i].total_duration;
-                    }
-
-                    auto start = std::chrono::high_resolution_clock::now();
-
-                    intersection_candidate_test(index_sequences, intersection_result_p1, equal_result, query_id_idx, candidate_posting_tmp, m);
-                    auto end = std::chrono::high_resolution_clock::now();
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                    avg_time_per += duration.count();
-
-                    if (repeat == 0) {
-                        total += equal_result;
-                        long double skip_tmp = 0;
-                        long double size_tmp = 0;
-                        for (int i = 0; i < index_sequences.size(); i++) {
-                            skip_tmp += index_sequences[i].total_skip;
-                            size_tmp += index_sequences[i].n;
-                        }
-                        avg_skip += skip_tmp / size_tmp;
-                        avg_query_total_size += size_tmp;
-                        avg_query_real_size += size_tmp - skip_tmp;
-
-                    }
-
-                    avg_time_round += avg_time_per;
-
-                    for (auto &enumerator : index_sequences) {
-                        enumerator.free_memory("normal");
-                    }
-                }
-                if (repeat == 0)
-                    std::cerr << "Total size: " << total << std::endl;
-                if (repeat > 0)
-                    querys_per_times.push_back(avg_time_round);
-            }
-            std::sort(querys_per_times.begin(), querys_per_times.end());
-            uint64_t avg_time = std::accumulate(querys_per_times.begin(), querys_per_times.end(), 0LL);
-            std::cerr << "Average query time: " <<  static_cast<long double> (avg_time) / query_list.size() / repeat_num / 1000 << ", " << "Median query time: " << static_cast<long double> (querys_per_times[querys_per_times.size() > 1 ? ((querys_per_times.size() + 1) / 2) : 0]) / query_list.size() / 1000 << std::endl;
-            std::cerr << "Average skip rate: " << avg_skip / query_list.size() << ", Average query total size: " << avg_query_total_size / query_list.size() << ", Average query real size: " << avg_query_real_size / query_list.size() << std::endl;
-        }
-
-        static void union_candidate_test(std::vector<lico_enumerator <K>> &index_sequences, K* result_p1, uint32_t &result, const uint32_t m) {
-            uint32_t cur_doc = std::min_element(index_sequences.begin(), index_sequences.end(), [](lico_enumerator <K> lhs, lico_enumerator <K> rhs) {return lhs.docid() < rhs.docid();})->docid();
-            K* result_start = result_p1;
-
-            while (cur_doc < INT_MAX) {
-                *result_p1++ = cur_doc;
-                uint32_t next_doc = INT_MAX;
-                for (int32_t i = 0; i < m; i++) {
-                    if (index_sequences[i].docid() == cur_doc) {
-                        index_sequences[i].next();
-                    }
-                    if (index_sequences[i].docid() < next_doc) {
-                        next_doc = index_sequences[i].docid();
-                    }
-                }
-                cur_doc = next_doc;
-            }
-
-            result = result_p1 - result_start;
-        }
-
-        void query_test_union_benchmark(const std::vector<std::vector<uint32_t>> &query_list) {
-            std::vector<uint64_t> querys_per_times;
-            uint64_t avg_time_per = 0;
-            uint64_t avg_time_round = 0;
-            K repeat_num = 5;
-
-            for (K repeat = 0; repeat < repeat_num + 1; repeat++) {
-                uint64_t total = 0;
-                int32_t query_id = 0;
-                avg_time_round = 0;
-                for (auto &query : query_list) {
-                    query_id++;
-
-                    if (query.size() < 2)
-                        continue;
-
-                    std::vector<lico_enumerator <K>> index_sequences = load_model(query);
-
-                    std::sort(index_sequences.begin(), index_sequences.end(), [](const lico_enumerator <K> &a, const lico_enumerator <K> &b) {return a.n < b.n;});
-
-
-                    uint32_t equal_result = 0;
-                    const uint32_t m = index_sequences.size();
-
-                    K *union_result_p1;
-                    std::vector<K> union_result_1(universe_size); // for normal
-                    union_result_p1 = union_result_1.data();
-
-                    // warm up
-                    for (auto k = 0; k < 5; k++) {
-                        for (auto i = 0;i < universe_size; i++)
-                            union_result_p1[i] = i + 1 + k;
-                    }
-
-                    avg_time_per = 0;
-
-                    for (int32_t i = 0; i < index_sequences.size(); i++) {
-                        index_sequences[i].next_init();
-                        avg_time_per += index_sequences[i].total_duration;
-                    }
-
-                    auto start = std::chrono::high_resolution_clock::now();
-
-                    union_candidate_test(index_sequences, union_result_p1, equal_result, m);
-
-                    auto end = std::chrono::high_resolution_clock::now();
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                    avg_time_per += duration.count();
-
-                    if (repeat == 0) {
-                        total += equal_result;
-                        long double skip_tmp = 0;
-                        long double size_tmp = 0;
-                        for (int i = 0; i < index_sequences.size(); i++) {
-                            skip_tmp += index_sequences[i].total_skip;
-                            size_tmp += index_sequences[i].n;
-                        }
-                        avg_skip += skip_tmp / size_tmp;
-                        avg_query_total_size += size_tmp;
-                        avg_query_real_size += size_tmp - skip_tmp;
-
-                    }
-
-                    avg_time_round += avg_time_per;
-
-                    for (auto &enumerator : index_sequences) {
-                        enumerator.free_memory("simd");
-                    }
-                }
-                if (repeat == 0)
-                    std::cerr << "Total size: " << total << std::endl;
-                if (repeat > 0)
-                    querys_per_times.push_back(avg_time_round);
-            }
-            std::sort(querys_per_times.begin(), querys_per_times.end());
-            uint64_t avg_time = std::accumulate(querys_per_times.begin(), querys_per_times.end(), 0LL);
-            std::cerr << "Average query time: " <<  static_cast<long double> (avg_time) / query_list.size() / repeat_num / 1000 << ", " << "Median query time: " << static_cast<long double> (querys_per_times[querys_per_times.size() > 1 ? ((querys_per_times.size() + 1) / 2) : 0]) / query_list.size() / 1000 << std::endl;
-            std::cerr << "Average skip rate: " << avg_skip / query_list.size() << ", Average query total size: " << avg_query_total_size / query_list.size() << ", Average query real size: " << avg_query_real_size / query_list.size() << std::endl;
-        }
-
 
     public:
         K universe_size;
@@ -834,10 +533,6 @@ namespace lico_sequence {
                 query_test_intersection(query_list, decode_type);
             else if (query_type == "OR")
                 query_test_union(query_list, decode_type);
-            else if (query_type == "ANDB")
-                query_test_intersection_benchmark(query_list);
-            else if (query_type == "ORB")
-                query_test_union_benchmark(query_list);
             else {
                 std::cerr << "Error: query_type must be AND, OR, ANDB or ORB" << std::endl;
             }

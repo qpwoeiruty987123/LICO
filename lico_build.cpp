@@ -14,7 +14,7 @@ void build_collection_lico(const std::string input_basename, const std::string o
     PGM_INDEX_BUILDER index;
     if (!read_only){
         index.build_model(input_basename + ".docs", lico_m);
-        // index.data_test(input_basename + ".docs");
+        index.data_test(input_basename + ".docs");
         index.save_model(output_basename);
         if(!log_filename.empty()) { // save covered and residual
             index.statistic_index(log_filename);
@@ -24,7 +24,7 @@ void build_collection_lico(const std::string input_basename, const std::string o
         }
     } else {
         index.load_model(output_basename);
-        // index.data_test(input_basename + ".docs");
+        index.data_test(input_basename + ".docs");
 
         if(!log_filename.empty()) { // save covered and residual
             index.statistic_index(log_filename);
@@ -61,7 +61,7 @@ int main(int argc, const char** argv)
 
     read_only = (read_only_str == "t");
 
-    if (index_type == "pgm")  //compress docs
+    if (index_type == "lico")  //compress docs
         switch (epsilon)
         {
             case 0: build_collection_lico<0>(input_basename, output_basename); break; // represents adopting data partition method
@@ -83,7 +83,6 @@ int main(int argc, const char** argv)
             case 65535: build_collection_lico<65535>(input_basename, output_basename); break;
             case 131071: build_collection_lico<131071>(input_basename, output_basename); break;
             case 262143: build_collection_lico<262143>(input_basename, output_basename); break;
-
 
             default: std::cerr << "Unsupported Epsilon Value: " << epsilon << std::endl; break;
         }

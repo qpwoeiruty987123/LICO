@@ -1,6 +1,6 @@
 #include <other_index.hpp>
 
-#include "la_vector_enumerate.hpp"
+#include "script/la_vector_enumerate.hpp"
 #include "lico_index_build.hpp"
 
 std::string log_filename = "";

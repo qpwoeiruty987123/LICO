@@ -42,7 +42,7 @@ int main(int argc, const char** argv)
     log_filename = argv[8];
     residual_compress_type = argv[9];
 
-    if (index_type == "pgm")
+    if (index_type == "lico")
         switch (epsilon)
         {
             case 0: test_collection_lico<0>(input_basename, output_basename); break; // represents adopting data partition method

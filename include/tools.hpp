@@ -76,9 +76,10 @@ static void write_index_data(std::ofstream& out, const IndexT& index) {
     // segments metadata
     out.write(reinterpret_cast<const char*>(&index.segments_size), sizeof(uint32_t));
     out.write(reinterpret_cast<const char*>(&index.bpc_covered), sizeof(uint8_t));
-    out.write(reinterpret_cast<const char*>(&index.bpc_intercept), sizeof(uint8_t));
-    out.write(reinterpret_cast<const char*>(&index.bpc_slope_exponent), sizeof(uint8_t));
-    out.write(reinterpret_cast<const char*>(&index.bpc_slope_significand), sizeof(uint8_t));
+    out.write(reinterpret_cast<const char*>(&index.bpc_delta_y), sizeof(uint8_t));
+    out.write(reinterpret_cast<const char*>(&index.bpc_delta_x), sizeof(uint8_t));
+    out.write(reinterpret_cast<const char*>(&index.bpc_y_b), sizeof(uint8_t));
+    out.write(reinterpret_cast<const char*>(&index.bpc_x_b), sizeof(uint8_t));
 
     // seg arrays
     auto write_vector = [&out](const auto& vec) {
@@ -89,13 +90,15 @@ static void write_index_data(std::ofstream& out, const IndexT& index) {
         }
     };
     write_vector(index.seg_covered_compress);
-    write_vector(index.seg_intercept_compress);
-    write_vector(index.seg_slope_exponent_compress);
-    write_vector(index.seg_slope_significand_compress);
+    write_vector(index.seg_delta_y_compress);
+    write_vector(index.seg_delta_x_compress);
+    write_vector(index.seg_y_b_compress);
+    write_vector(index.seg_x_b_compress);
 
 #if RESIDUAL_COMPRESS
     write_vector(index.corrections_compress);
 #else
+    write_vector(index.corrections_none);
     auto write_bit_vector = [&out](const auto& vec) {
         size_t size = vec.size();
         out.write(reinterpret_cast<const char*>(&size), sizeof(size));
@@ -104,7 +107,6 @@ static void write_index_data(std::ofstream& out, const IndexT& index) {
         }
     };
     write_bit_vector(index.signs_none);
-    write_vector(index.corrections_none);
 #endif
 }
 
@@ -114,33 +116,40 @@ static void read_index_data(std::ifstream& in, IndexT& index) {
 
     in.read(reinterpret_cast<char*>(&index.segments_size), sizeof(uint32_t));
     in.read(reinterpret_cast<char*>(&index.bpc_covered), sizeof(uint8_t));
-    in.read(reinterpret_cast<char*>(&index.bpc_intercept), sizeof(uint8_t));
-    in.read(reinterpret_cast<char*>(&index.bpc_slope_exponent), sizeof(uint8_t));
-    in.read(reinterpret_cast<char*>(&index.bpc_slope_significand), sizeof(uint8_t));
+    in.read(reinterpret_cast<char*>(&index.bpc_delta_y), sizeof(uint8_t));
+    in.read(reinterpret_cast<char*>(&index.bpc_delta_x), sizeof(uint8_t));
+    in.read(reinterpret_cast<char*>(&index.bpc_y_b), sizeof(uint8_t));
+    in.read(reinterpret_cast<char*>(&index.bpc_x_b), sizeof(uint8_t));
 
     // seg arrays
     auto read_vector = [&in](auto& vec) {
         size_t size;
         in.read(reinterpret_cast<char*>(&size), sizeof(size));
-        vec.resize(size);
-        in.read(reinterpret_cast<char*>(vec.data()), size * sizeof(decltype(vec[0])));
+        if (size > 0) {
+            vec.resize(size);
+            in.read(reinterpret_cast<char*>(vec.data()), size * sizeof(decltype(vec[0])));
+        }
     };
+
     read_vector(index.seg_covered_compress);
-    read_vector(index.seg_intercept_compress);
-    read_vector(index.seg_slope_exponent_compress);
-    read_vector(index.seg_slope_significand_compress);
+    read_vector(index.seg_delta_y_compress);
+    read_vector(index.seg_delta_x_compress);
+    read_vector(index.seg_y_b_compress);
+    read_vector(index.seg_x_b_compress);
 
 #if RESIDUAL_COMPRESS
     read_vector(index.corrections_compress);
 #else
+    read_vector(index.corrections_none);
     auto read_bit_vector = [&in](auto& vec) {
         size_t size;
         in.read(reinterpret_cast<char*>(&size), sizeof(size));
-        vec.resize(size);
-        in.read(reinterpret_cast<char*>(vec.data()), (size + 7) / 8);
+        if (size > 0) {
+            vec.resize(size);
+            in.read(reinterpret_cast<char*>(vec.data()), (size + 7) / 8);
+        }
     };
     read_bit_vector(index.signs_none);
-    read_vector(index.corrections_none);
 #endif
 }
 

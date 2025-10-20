@@ -18,7 +18,7 @@ static inline long double LICO_S_scale = 136*200L; // scaling for S in bits cost
 #else
 static inline long double LICO_S_scale = 136L; // scaling for S in bits cost
 #endif
-static size_t page_size = 2048;    // keys per page
+static size_t page_size;    // keys per page
 
 #ifndef MIN_PAGES_PER_BLOCK
 #define MIN_PAGES_PER_BLOCK 1
@@ -74,7 +74,8 @@ public:
 
     lico_partition() = default;
 
-    explicit lico_partition(const std::vector<K>& data,  size_t global_m = 4096) : global_m(global_m) {
+    explicit lico_partition(const std::vector<K>& data,  size_t global_m = 4096, size_t t_page_size = 1024) : global_m(global_m) {
+        page_size = t_page_size;
         if (output_log) {
                 std::cerr << global_m << " " << page_size << " " << LICO_C_coef << " " << LICO_S_scale << "\n";
                 output_log = false;
@@ -158,10 +159,9 @@ public:
             return std::numeric_limits<size_t>::max();
         size_t eps_size_t = (size_t) eps_up;
 
-        // return eps_size_t;
+        // return eps_size_t; // no scale
 
-        // if (eps_size_t > 1 && LICO_C_coef == 0.001)
-            // return fill_all_bits_from_msb(eps_size_t * 2);
+
         if (eps_size_t > 1)
             return fill_all_bits_from_msb(eps_size_t);
         else
@@ -191,6 +191,8 @@ public:
     // If recompute_eps is true, we will also recompute epsilon* for the merged range;
     // otherwise we keep the shared epsilon as-is (since they matched).
     void merge_adjacent_same_epsilon(bool recompute_eps = false) {
+        // return; // no scale
+
         if (blocks.size() < 2) return;
 
         // Ensure blocks are in ascending order by start index
@@ -257,10 +259,10 @@ public:
         size_t m = global_m;
         if (m == 0) m = 1;
         if (m > max_blocks_by_pages) {
-            std::cerr << "[optimal_partition] requested m=" << m
-                    << " > feasible " << max_blocks_by_pages
-                    << " under MIN_PAGES_PER_BLOCK=" << MIN_PAGES_PER_BLOCK
-                    << ". Using m=" << max_blocks_by_pages << " instead.\n";
+            // std::cerr << "[optimal_partition] requested m=" << m
+            //         << " > feasible " << max_blocks_by_pages
+            //         << " under MIN_PAGES_PER_BLOCK=" << MIN_PAGES_PER_BLOCK
+            //         << ". Using m=" << max_blocks_by_pages << " instead.\n";
             m = max_blocks_by_pages;
         }
 
