@@ -3,8 +3,8 @@
 #include <iostream>
 #include <cassert>
 #include <vector>
-#include <lico_index.hpp>
-#include <lico_index_enumerate.hpp>
+#include <lico_kernel.hpp>
+#include <lico_enumerate.hpp>
 #include <lico_partition.hpp>
 #include <mm_file.hpp>
 
@@ -128,7 +128,7 @@ namespace lico_sequence
                         segments_size += index.segment_size_in_bytes();
                         corrections_size += index.corrections_size_in_bytes();
                         signs_size += index.signs_size_in_bytes();
-                        errorpoint_size += index.errorPointCount;
+                        // errorpoint_size += index.errorPointCount;
                     }
                     list_count++;
                     long double total_list_size = list_segments_size + list_corrections_size + list_signs_size;
@@ -155,7 +155,7 @@ namespace lico_sequence
                     segments_size += index.segment_size_in_bytes();
                     corrections_size += index.corrections_size_in_bytes();
                     signs_size += index.signs_size_in_bytes();
-                    errorpoint_size += index.errorPointCount;
+                    // errorpoint_size += index.errorPointCount;
 
                     long double total_list_size = list_segments_size + list_corrections_size + list_signs_size;
                     file << "List:\t" << list_count << "\tSegment Size:\t" << list_segments_size << "\tCorrection Size:\t" << list_corrections_size << "\tSign Size:\t" << list_signs_size << "\tList Length:\t" << list_size << "\tTotal bits per int:\t" << total_list_size / list_size * 8.0 << std::endl;
@@ -166,7 +166,7 @@ namespace lico_sequence
             std::cerr << "Epsilon:\t" << epsilon << std::endl;
             std::cerr << "Integer Count:\t" << data_size << std::endl;
             std::cerr << "Segments count:\t" << segments_count_real << std::endl;
-            std::cerr << "Error Point Count:\t" << errorpoint_size << std::endl;
+            // std::cerr << "Error Point Count:\t" << errorpoint_size << std::endl;
             std::cerr << "Average Covered:\t" << avg_covered / segments_count << std::endl;
             std::cerr << "Average Segments per List:\t" << segments_count / total_list << std::endl;
             std::cerr << "Segment Size:\t" << segments_size << "\tbyte" << std::endl;
@@ -180,7 +180,7 @@ namespace lico_sequence
                 file << "Epsilon:\t" << epsilon << std::endl;
                 file << "Integer Count:\t" << data_size << std::endl;
                 file << "Segments count:\t" << segments_count_real << std::endl;
-                file << "Error Point Count:\t" << errorpoint_size << std::endl;
+                // file << "Error Point Count:\t" << errorpoint_size << std::endl;
                 file << "Average Covered:\t" << avg_covered / segments_count << std::endl;
                 file << "Average Length:\t" << segments_count / index_sequences.size() << std::endl;
                 file << "Segment Size:\t" << segments_size << "\tbyte" << std::endl;
@@ -346,11 +346,20 @@ namespace lico_sequence
 
                     std::vector<K> result_decode(enumerator_tmp.n);
 
+                    // scalar test
                     // enumerator_tmp.residuals_decode();
                     // enumerator_tmp.normal_decode(result_decode.data());
 
+                    // simd test
                     enumerator_tmp.simd_init();
-                    enumerator_tmp.simd_decode_512i(result_decode.data());
+#if SIMD_512_1D1S
+                    enumerator_tmp.simd_decode_512i_1d1s(result_decode.data());
+#elif SIMD_512_2D1S
+                    enumerator_tmp.simd_decode_512i_2d1s(result_decode.data());
+#elif SIMD_256_1D1S
+                    enumerator_tmp.simd_decode_256i_1d1s(result_decode.data());
+#endif
+
 
                     assert(result_decode.size() == sequence.size());
 

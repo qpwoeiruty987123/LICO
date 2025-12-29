@@ -3,8 +3,9 @@
 #include <iostream>
 #include <cassert>
 #include <vector>
-#include <lico_index.hpp>
-#include <lico_index_enumerate.hpp>
+#include <perf_event.hpp>
+#include <lico_kernel.hpp>
+#include <lico_enumerate.hpp>
 
 
 namespace lico_sequence {
@@ -31,6 +32,7 @@ namespace lico_sequence {
 
             if (decode_type == "simd") {
                 index.simd_init();
+
 #if USE_HUGEPAGE
                 std::vector<K, HugePageAllocator<K>> result1(index.n);
 #else
@@ -43,7 +45,27 @@ namespace lico_sequence {
                         }
                     }
                 }
-                index.simd_decode_512i(result1.data());
+
+                PerfEvent perf_event;
+                perf_event.startCounters();
+
+#if SIMD_512_1D1S
+                index.simd_decode_512i_1d1s(result1.data());
+#elif SIMD_512_2D1S
+                index.simd_decode_512i_2d1s(result1.data());
+#elif SIMD_256_1D1S
+                index.simd_decode_256i_1d1s(result1.data());
+#endif
+
+                perf_event.stopCounters();
+                std::stringstream header_out;
+                std::stringstream data_out;
+                PerfEvent::printCounter(header_out, data_out, "time sec", perf_event.getDuration());
+                perf_event.printReport(header_out, data_out, 1);
+                std::vector<double> perf_data_tmp = parseDoubles(data_out.str(), ',');
+                for (int i = 0; i < perf_data_tmp.size(); i++) {
+                    perf_data[i].push_back(perf_data_tmp[i]);
+                }
 
 
                 // debug
@@ -69,6 +91,8 @@ namespace lico_sequence {
                     min_decode_time = index.total_duration;
             }
             else if (decode_type == "normal") {
+                index.residuals_decode();
+
 #if USE_HUGEPAGE
                 std::vector<K, HugePageAllocator<K>> result2(index.n);
 #else
@@ -83,11 +107,25 @@ namespace lico_sequence {
                     }
                 }
 
-                index.residuals_decode();
-                auto start = std::chrono::high_resolution_clock::now();
+                PerfEvent perf_event;
+                perf_event.startCounters();
+
+                // auto start = std::chrono::high_resolution_clock::now();
                 index.normal_decode(result2.data());
-                auto end = std::chrono::high_resolution_clock::now();
-                index.total_duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+                // auto end = std::chrono::high_resolution_clock::now();
+                // index.total_duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+
+                perf_event.stopCounters();
+                std::stringstream header_out;
+                std::stringstream data_out;
+                PerfEvent::printCounter(header_out, data_out, "time sec", perf_event.getDuration());
+                perf_event.printReport(header_out, data_out, 1);
+                std::vector<double> perf_data_tmp = parseDoubles(data_out.str(), ',');
+                for (int i = 0; i < perf_data_tmp.size(); i++) {
+                    perf_data[i].push_back(perf_data_tmp[i]);
+                }
+
 
 #if USE_HUGEPAGE
                 std::vector<K, HugePageAllocator<K>> ().swap(result2);
@@ -118,26 +156,38 @@ namespace lico_sequence {
 
             std::cerr << "Decode per integer: " << static_cast<long double> (total_decode_time) / data_size * 1000.0 << " nanoseconds" << std::endl;
 
-            // std::cerr << "Performance: " << std::endl;
-            // for (const auto &header : perf_header) {
-            //     std::cerr << std::setw(15) << header;
-            // }
-            // std::cerr << std::endl;
+            std::cerr << "Performance: " << std::endl;
+            for (const auto &header : perf_header) {
+                std::cerr << std::setw(15) << header;
+            }
+            std::cerr << std::endl;
 
-            // for (const auto &data : perf_data) {
-            //     double mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
-            //     std::cerr << std::setw(15) << std::fixed << std::setprecision(2) << mean;
-            // }
-            // std::cerr << std::endl << std::endl;
+            for (const auto &data : perf_data) {
+                double mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
+                std::cerr << std::setw(15) << std::fixed << std::setprecision(2) << mean;
+            }
+            std::cerr << std::endl << std::endl;
 
         }
 
         void test_model(const std::string input_basename, std::string decode_type) {
+            // init perf_header
+            PerfEvent perf_event;
+            perf_event.startCounters();
+
             if (input_basename.empty() || input_basename.back() != '/') {
                 std::cerr << "Error: input_basename must end with '/'" << std::endl;
                 return;
             }
             std::cerr << "Load index from: " << input_basename << std::endl;
+
+            perf_event.stopCounters();
+            std::stringstream header_out;
+            std::stringstream data_out;
+            PerfEvent::printCounter(header_out, data_out, "time sec", perf_event.getDuration());
+            perf_event.printReport(header_out, data_out, 1);
+            perf_header = split_str(header_out.str(), ',');
+            perf_data.resize(perf_header.size());
 
             std::ifstream in_header(input_basename + "idx.size", std::ios::binary);
             if (!in_header) {

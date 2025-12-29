@@ -1,5 +1,5 @@
 #include <config.hpp>
-#include <lico_index_build.hpp>
+#include <lico_build.hpp>
 
 std::string log_filename = "";
 std::string decode_type = "";

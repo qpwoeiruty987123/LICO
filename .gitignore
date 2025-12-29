@@ -2,7 +2,9 @@ cmake-build-debug/
 cmake-build-release/
 .idea/
 .vscode/
+ablation_exp/
 build/
 script/
 nohup_output/
-nohup_output_tmp/
+nohup_output/nohup_output_tmp/
+test*

@@ -154,3 +154,6 @@ static void read_index_data(std::ifstream& in, IndexT& index) {
 }
 
 
+inline static int64_t sign_bit(int64_t x) {
+    return static_cast<int64_t> (static_cast<uint64_t>(x) >> 63);
+}

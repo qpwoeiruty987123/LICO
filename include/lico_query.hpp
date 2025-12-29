@@ -2,8 +2,8 @@
 
 #include <vp2intersect.h>
 #include <vp2union.hpp>
-#include <lico_index.hpp>
-#include <lico_index_enumerate.hpp>
+#include <lico_kernel.hpp>
+#include <lico_enumerate.hpp>
 #include <mm_file.hpp>
 
 namespace lico_sequence {

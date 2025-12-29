@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include <lico_index_decode.hpp>
+#include <lico_decode.hpp>
 
 std::string decode_type = "";
 

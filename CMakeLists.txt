@@ -8,17 +8,19 @@ add_compile_options(-mavx512cd)
 add_compile_options(-mavx512dq)
 
 
-  if(NOT CMAKE_BUILD_TYPE)
-      set(CMAKE_BUILD_TYPE "Release")
-  endif()
-  MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE} )
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
+MESSAGE( STATUS "CMAKE_BUILD_TYPE: " ${CMAKE_BUILD_TYPE} )
+
+set(CMAKE_CXX_FLAGS "-DHUGEPAGE")
+# set(CMAKE_CXX_FLAGS "-DSIMD_512_2D1S")
+set(CMAKE_CXX_FLAGS "-DSIMD_256_1D1S")
+# set(CMAKE_CXX_FLAGS "-DSIMD_512_1D1S")
 
 set(CMAKE_CXX_FLAGS_NDEBUG "-O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -w")
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3 -w -DHUGEPAGE")
 
-
-#DHUGEPAGE
 
 
 set(CMAKE_CXX_STANDARD 17)
@@ -73,3 +75,4 @@ add_variants(lico_decode lico_decode.cpp)
 add_variants(lico_query lico_query.cpp)
 
 #add_uncompress(other other_index.cpp)
+add_executable(test test.cpp)

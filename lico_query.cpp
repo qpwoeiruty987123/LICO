@@ -1,4 +1,4 @@
-#include <lico_index_query.hpp>
+#include <lico_query.hpp>
 
 std::string log_filename = "";
 std::string decode_type = "";

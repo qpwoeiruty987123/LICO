@@ -417,61 +417,7 @@ namespace lico
             std::vector<Correction_Value>().swap(corrections_vector);
         }
 
-        //         std::vector<K> normal_decode() {
-        //     std::vector<K> output;
-        //     output.resize(n);
-        //     uint32_t pointer = 0;
-        //
-        //     residual_init();
-        //
-        //     int last_first = 0;
-        //     for (uint32_t i= 0; i < segments_size; i++) {
-        //         auto covered = seg_covered[i];
-        //         auto delta_y = seg_delta_y[i];
-        //         auto delta_x = seg_delta_x[i];
-        //         auto delta_x_divide = delta_x >> 1;
-        //         auto y_b = seg_y_b[i];
-        //         auto x_b = seg_x_b[i];
-        //
-        //         int32_t last_correction = y_b +  corrections_vector[pointer];
-        //
-        //         // if (i == segments_size - 1 && covered == 1) {
-        //         //     std::cerr << "Here" << std::endl;
-        //         // }
-        //
-        //         int32_t j = last_first;
-        //         int64_t result = (static_cast<int64_t> (delta_y) * (j - x_b) + (delta_x_divide) * (j > x_b ? 1 : j == x_b ? 0 : -1));
-        //         output[pointer++] = result / delta_x + last_correction;
-        //         for (j = last_first + 1; j < last_first + covered; ++j) {
-        //             last_correction = last_correction + corrections_vector[pointer];
-        //
-        //             // int64_t other_result = delta_y * (j - x_b) + (delta_x / 2) * (j > x_b ? 1 : j == x_b ? 0 : -1);
-        //             // other_result /= delta_x;
-        //
-        //             // result += delta_y + (delta_x_divide) * (j == x_b - 1 ? 1 : j == x_b ? 1 : 0) ;
-        //             result += delta_y + (delta_x_divide) * (j == x_b ? 1 : j == x_b + 1 ? 1 : 0) ;
-        //
-        //             // if (result > INT32_MAX) {
-        //             //     std::cerr << "Correction value is too big: " << result << std::endl;
-        //             // }
-        //
-        //             // if (other_result != result) {
-        //             //     exit(0);
-        //             //     // std::cerr << " Here" << std::endl;
-        //             // }
-        //             // result /= delta_x;
-        //             // result += last_correction;
-        //             output[pointer++] = result / delta_x + last_correction;
-        //             // output[pointer] = ((j * significand) >> exponent) + last_correction;
-        //             // pointer++;
-        //         }
-        //         last_first += covered;
-        //     }
-        //
-        //     return output;
-        // }
-
-        std::vector<K> normal_decode() {
+        std::vector<K> scalar_decode() {
             std::vector<K> output;
             output.resize(n);
             uint32_t pointer = 0;

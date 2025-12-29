@@ -1,5 +1,5 @@
 #!/bin/bash
-result_dir="/mnt/supplement/result"
+result_dir="/mnt/supplement/xyzhu/result"
 # Modify it to the dir where your dataset is located, the structure is as followed:
 # data_dir/CW12B/
 #                               |_______CW12B.docs
@@ -8,8 +8,8 @@ result_dir="/mnt/supplement/result"
 #                               |_______CW12B-3.queries
 #                               |_______CW12B-4.queries
 #                               |_______CW12B-5.queries  // this file contains queries that the number of terms is equal or larger than 5
-data_dir="/mnt/home/datasets"
-code_dir="/mnt/home/codes/lico/build"
+data_dir="/mnt/home/xyzhu/datasets"
+code_dir="/mnt/home/xyzhu/codes/lico/build"
 
 
 source_dir="./"
@@ -30,45 +30,45 @@ compress_type="fastpfor"
 epsilon=0
 
 # add your datasets like this
-#for dataset in "CW12B" "CCNews" "WITD"
-for dataset in "wit-100K"
+#for dataset in "CW12B" "CCNews" "WITD" "wit-100K" "cw12b-1M" "ccnews-1M"
+for dataset in "cw12b-1M" "ccnews-1M" "wit-100K"
 do
   for lico_m in 8
   do
     # read only decides whether to build the collection or read from the index_save_dir
-    read_only="f"
+    read_only="t"
 
     index_save_dir="$result_dir/index/$dataset/$index_type-$compress_type-$lico_m/$dataset-$index_type-$epsilon/"
     log_save_dir="$result_dir/log/$dataset/$index_type-$compress_type-$lico_m"
     mkdir -p $index_save_dir
     mkdir -p $log_save_dir
 
-      echo "=================Building index for dataset: $dataset with epsilon: $epsilon================="
-      $code_dir/lico_build $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $read_only $decode_type $log_save_dir/$dataset-$index_type-$epsilon $lico_m $compress_type
+#    echo "=================Building index for dataset: $dataset with epsilon: $epsilon================="
+#    $code_dir/lico_build $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $read_only $decode_type $log_save_dir/$dataset-$index_type-$epsilon $lico_m $compress_type
 
     echo "=================Decode index for dataset: $dataset with epsilon: $epsilon================="
-      for decode_type in "simd"
-      do
-        for repeat in 1 2 3 4 5
-        do
-          echo "————————————repeat : $repeat————————————"
-          $code_dir/lico_decode $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $decode_type $log_save_dir $compress_type
-        done
-      echo " "
-    done
-
-    echo "=================Query index for dataset: $dataset with epsilon: $epsilon================="
-    for query_type in "AND" "OR"
+    for decode_type in "normal" "simd"
     do
-      for query_num in 5 4 3 2
+      for repeat in 1 2 3 4 5
       do
-        for decode_type in "simd"
-        do
-          echo "=========================dataset : $dataset epsilon: $epsilon query_type: $query_type query_num: $query_num decode_type: $decode_type========================="
-          $code_dir/lico_query $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $decode_type $data_dir/$dataset/$dataset-$query_num.queries $query_type $log_save_dir/$dataset-$compress_type-$epsilon.query-$query_num-log.txt $compress_type
-        done
-        echo " "
+        echo "————————————repeat : $repeat————————————"
+        $code_dir/lico_decode $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $decode_type $log_save_dir $compress_type
       done
-    done
+    echo " "
+  done
+
+  #   echo "=================Query index for dataset: $dataset with epsilon: $epsilon================="
+  #   for query_type in "AND" "OR"
+  #   do
+  #     for query_num in 5 4 3 2
+  #     do
+  #       for decode_type in "simd"
+  #       do
+  #         echo "=========================dataset : $dataset epsilon: $epsilon query_type: $query_type query_num: $query_num decode_type: $decode_type========================="
+  #         $code_dir/lico_query $index_type $data_dir/$dataset/$dataset $index_save_dir $epsilon $decode_type $data_dir/$dataset/$dataset-$query_num.queries $query_type $log_save_dir/$dataset-$compress_type-$epsilon.query-$query_num-log.txt $compress_type
+  #       done
+  #       echo " "
+  #     done
+  #   done
   done
 done
