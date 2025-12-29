@@ -1,8 +1,7 @@
 # LICO
-An SIMD-Aware High-Performance Learned Inverted Index
-Compression Framework
+An SIMD-Aware High-Performance Learned Inverted Index Compression Framework
 
-This repository provides end-to-end components for building, storing, decoding, and querying LICO-compressed posting lists, with both scalar and AVX-512 SIMD implementation.
+This repository provides end-to-end components for building, storing, decoding, and querying LICO-compressed posting lists, with both scalar, AVX2 and AVX-512 SIMD implementation.
 
 ## Dataset preparation
 Following the [ds2i](https://github.com/ot/ds2i) format, your dataset directory should be structured as follows:
@@ -94,20 +93,20 @@ Key headers in `include/` and their roles:
     - `HUGEPAGE`: hint to use huge pages when available
 	- `RESIDUAL_COMPRESS`: compile-time defines for residual compression
 	- `residual_compress_type`: residual codec (currently `fastpfor`)
-- `lico_index.hpp`: the core codes to build LICO and LICO++
+- `lico_kernel.hpp`: the core codes to build LICO and LICO++
 	- Stores per-segment parametersas bit-packed integer vectors
 	- Residuals are stored as bit-packed with magnitude and sign bits (LICO) or ZigZag+FastPFor compressed (LICO++)
-- `lico_index_enumerate.hpp`: LICO's high-performance query processing engine
+- `lico_enumerate.hpp`: LICO's high-performance query processing engine
 	- `lico_enumerator<K>` holds segments and residuals; implements `normal_decode` and `simd_decode_512i` (AVX-512)
 	- Supports `NextGeq` for filter within lists; uses memory re-layout and alignment for SIMD throughput
-- `lico_index_build.hpp`: dataset-to-index builder
+- `lico_build.hpp`: dataset-to-index builder
 	- `lico_builder<K, epsilon>` reads `<basename>.docs`, trains/partitions lists, and selects epsilon
 		- `epsilon == 0`: partition the list and choose epsilon* per block
 		- otherwise: fixed epsilon
 	- Includes `statistic_index`, `data_test`, `save_model`, `load_model`
-- `lico_index_decode.hpp`: offline decoder/benchmark driver
+- `lico_decode.hpp`: offline decoder/benchmark driver
 	- `lico_decoder<K, epsilon>` loads the stored indexes and runs `simd` or `normal` decoding
-- `lico_index_query.hpp`: query driver (Intersection/Union)
+- `lico_query.hpp`: query driver (Intersection/Union)
 	- Loads a subset of lists and computes intersection/union using SIMD set ops
 - `lico_partition.hpp`: page-based partitioning and epsilon* estimation
 	- Greedy/DP partitioning by gap variance; computes error-scaling epsilon* and estimated bit cost per block; merges adjacent blocks with the same epsilon
